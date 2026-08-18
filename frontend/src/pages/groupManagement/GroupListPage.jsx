@@ -94,13 +94,23 @@ const GroupListPage = () => {
           </p>
         </div>
 
-        <Link
-          to="/groups/create"
-          className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Create New Group</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/groups/dashboard"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 border border-teal-500/30 text-xs font-bold transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Users className="w-4 h-4" />
+            <span>Group Dashboard</span>
+          </Link>
+
+          <Link
+            to="/groups/create"
+            className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Create New Group</span>
+          </Link>
+        </div>
       </div>
 
       {msg && (
@@ -174,7 +184,14 @@ const GroupListPage = () => {
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-white">{g.groupName}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-white">{g.groupName}</h3>
+                      {g.organizationId?.code && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[9px]">
+                          {g.organizationId.code}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] font-mono text-teal-400 font-bold">{g.groupCode}</span>
                   </div>
 
@@ -189,9 +206,12 @@ const GroupListPage = () => {
 
                 <div className="space-y-1 text-xs text-slate-300 pt-2 border-t border-slate-800">
                   <div>Type: <strong className="text-white">{g.groupType}</strong></div>
-                  <div>Branch: <strong className="text-teal-400">{g.branchId?.branchName || 'JP Nagar'}</strong></div>
-                  <div>Group Leader: <strong className="text-white">{g.leaderId?.fullName || 'Sunita Bhatt'}</strong></div>
-                  <div className="font-mono text-emerald-400 pt-1 font-bold">{g.totalMembers || 12} Enrolled Members</div>
+                  <div>Branch: <strong className="text-teal-400">{g.branchId?.branchName || 'Unassigned'}</strong></div>
+                  {g.organizationId?.name && (
+                    <div className="text-[11px] text-slate-500">Society: <span>{g.organizationId.name}</span></div>
+                  )}
+                  <div>Group Leader: <strong className="text-white">{g.leaderId?.fullName || 'Not Assigned'}</strong></div>
+                  <div className="font-mono text-emerald-400 pt-1 font-bold">{g.totalMembers || (g.memberIds?.length || 0)} Enrolled Members</div>
                 </div>
               </div>
 

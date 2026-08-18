@@ -11,11 +11,19 @@ import {
   Eye, 
   CheckCircle2, 
   AlertCircle, 
-  Loader2 
+  Loader2,
+  Building2
 } from 'lucide-react';
-import { fetchUsersList, resetUserPasswordApi, toggleUserStatusApi, deleteUserApi, fetchBranchesList } from '../../services/api';
+import { fetchUsersList, resetUserPasswordApi, toggleUserStatusApi, deleteUserApi, fetchBranchesList, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const UserListPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,12 +40,37 @@ const UserListPage = () => {
   const [msg, setMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   const loadUsers = async () => {
     setLoading(true);
     try {
+      const userParams = { search, role: roleFilter, branchId: branchFilter, status: statusFilter };
+      const branchParams = {};
+
+      if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+        userParams.organizationId = selectedOrgId;
+        branchParams.organizationId = selectedOrgId;
+      }
+
       const [uRes, bRes] = await Promise.all([
-        fetchUsersList({ search, role: roleFilter, branchId: branchFilter, status: statusFilter }),
-        fetchBranchesList(),
+        fetchUsersList(userParams),
+        fetchBranchesList(branchParams),
       ]);
       if (uRes.data && uRes.data.success) {
         setUsers(uRes.data.data);
@@ -54,7 +87,7 @@ const UserListPage = () => {
 
   useEffect(() => {
     loadUsers();
-  }, [roleFilter, branchFilter, statusFilter]);
+  }, [roleFilter, branchFilter, statusFilter, selectedOrgId]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -160,6 +193,28 @@ const UserListPage = () => {
         </form>
 
         <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
+          {/* Super Admin Organization Filter */}
+          {isSuperAdmin && (
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <select
+                value={selectedOrgId}
+                onChange={(e) => {
+                  setSelectedOrgId(e.target.value);
+                  setBranchFilter('All');
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-bold focus:outline-none"
+              >
+                <option value="All">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <Filter className="w-4 h-4 text-slate-500" />
           
           <select
@@ -227,7 +282,14 @@ const UserListPage = () => {
                           {u.name ? u.name[0] : 'U'}
                         </div>
                         <div>
-                          <div>{u.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span>{u.name}</span>
+                            {u.organizationId?.code && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[9px]">
+                                {u.organizationId.code}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[11px] text-slate-500 font-mono font-normal">@{u.username}</div>
                         </div>
                       </div>
@@ -238,7 +300,10 @@ const UserListPage = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-300">
-                      {u.branchId ? u.branchId.branchName || 'Assigned Branch' : 'Head Office'}
+                      <div>{u.branchId ? u.branchId.branchName || 'Assigned Branch' : 'Head Office'}</div>
+                      {u.organizationId?.name && (
+                        <div className="text-[10px] text-slate-500">{u.organizationId.name}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div>{u.email}</div>

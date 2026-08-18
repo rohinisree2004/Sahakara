@@ -44,19 +44,19 @@ const MemberProfilePage = () => {
   }
 
   const m = member || {
-    memberId: 'MEM-2026-101',
-    fullName: 'Ganesh Bhatt',
-    phone: '+91 99000 00007',
-    email: 'member@coop.org',
-    address: '24th Main, JP Nagar 5th Phase',
-    district: 'Bengaluru Urban',
-    state: 'Karnataka',
+    memberId: 'MEM-000',
+    fullName: 'Member Record',
+    phone: 'N/A',
+    email: 'N/A',
+    address: 'N/A',
+    district: '',
+    state: '',
     category: 'Regular Member',
-    joiningDate: new Date('2024-01-10'),
+    joiningDate: new Date(),
     membershipStatus: 'Active',
-    branchId: { branchName: 'JP Nagar Main Branch', branchCode: 'JP-01' },
-    nominee: { name: 'Sunita Bhatt', relationship: 'Spouse', sharePercentage: 100 },
-    kycDocuments: { aadhaarNumber: 'XXXX-XXXX-8821', panNumber: 'ABCDE1234F', kycVerified: true },
+    branchId: { branchName: 'Main Branch', branchCode: 'BR-01' },
+    nominee: { name: 'N/A', relationship: 'N/A', sharePercentage: 100 },
+    kycDocuments: { aadhaarNumber: 'N/A', panNumber: 'N/A', kycVerified: false },
   };
 
   return (
@@ -92,7 +92,7 @@ const MemberProfilePage = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Category: <strong className="text-white">{m.category}</strong> • Branch: <strong className="text-emerald-400">{m.branchId?.branchName || 'JP Nagar'}</strong>
+              Category: <strong className="text-white">{m.category}</strong> • Branch: <strong className="text-emerald-400">{m.branchId?.branchName || m.branchName || 'Head Office'}</strong>
             </p>
           </div>
         </div>
@@ -109,12 +109,12 @@ const MemberProfilePage = () => {
           </h3>
 
           <div className="space-y-2 text-xs text-slate-300">
-            <div>Phone: <strong className="text-white">{m.phone}</strong></div>
+            <div>Phone: <strong className="text-white">{m.phone || 'N/A'}</strong></div>
             <div>Email: <strong className="text-white">{m.email || 'N/A'}</strong></div>
-            <div>Address: <strong className="text-white">{m.address ? `${m.address}, ${m.district}` : 'JP Nagar'}</strong></div>
+            <div>Address: <strong className="text-white">{m.address ? (m.district ? `${m.address}, ${m.district}` : m.address) : 'N/A'}</strong></div>
             <div className="pt-2 border-t border-slate-800">
               <div className="text-slate-400 font-medium">Nominee Information</div>
-              <div className="text-white font-bold">{m.nominee?.name || 'Sunita Bhatt'} ({m.nominee?.relationship || 'Spouse'})</div>
+              <div className="text-white font-bold">{m.nominee?.name || 'N/A'} {m.nominee?.relationship ? `(${m.nominee.relationship})` : ''}</div>
               <div className="text-emerald-400 font-mono text-[11px]">Share: {m.nominee?.sharePercentage || 100}%</div>
             </div>
           </div>

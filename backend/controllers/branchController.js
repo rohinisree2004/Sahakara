@@ -5,9 +5,9 @@ const AuditLog = require('../models/AuditLog');
 
 // Helper to resolve orgId & branchId from context
 const resolveScope = (req) => {
-  let orgId = req.user.organizationId || '65e111111111111111111111';
-  if (req.user.role === 'Super Admin' && req.query.organizationId) {
-    orgId = req.query.organizationId;
+  let orgId = req.user.organizationId || null;
+  if (req.user.role === 'Super Admin') {
+    orgId = req.query.organizationId || req.body.organizationId || null;
   }
   const branchId = req.query.branchId || req.params.id || null;
   return { orgId, branchId };
@@ -38,32 +38,38 @@ exports.getBranchDashboard = async (req, res, next) => {
     const Group = require('../models/Group');
 
     let branch = null;
-    if (branchId) {
-      branch = await Branch.findOne({ _id: branchId, organizationId: orgId });
-    } else {
-      branch = await Branch.findOne({ organizationId: orgId, isDeleted: false });
-    }
+    let branchFilter = { isDeleted: false };
+    if (orgId) branchFilter.organizationId = orgId;
+    if (branchId) branchFilter._id = branchId;
+
+    branch = await Branch.findOne(branchFilter);
 
     const queryBranchId = branch ? branch._id : branchId;
-    const employeeCount = queryBranchId
-      ? await User.countDocuments({ organizationId: orgId, branchId: queryBranchId, role: 'Employee' })
-      : await User.countDocuments({ organizationId: orgId, role: 'Employee' });
-    const memberCount = queryBranchId
-      ? await Member.countDocuments({ organizationId: orgId, branchId: queryBranchId })
-      : await Member.countDocuments({ organizationId: orgId });
-    const groupCount = queryBranchId
-      ? await Group.countDocuments({ organizationId: orgId, branchId: queryBranchId, isDeleted: false })
-      : await Group.countDocuments({ organizationId: orgId, isDeleted: false });
+    const countFilter = { isDeleted: false };
+    if (orgId) countFilter.organizationId = orgId;
+    if (queryBranchId) countFilter.branchId = queryBranchId;
+
+    const employeeCount = await User.countDocuments({ ...countFilter, role: 'Employee' });
+    const memberCount = await Member.countDocuments(queryBranchId ? { ...(orgId && { organizationId: orgId }), branchId: queryBranchId } : (orgId ? { organizationId: orgId } : {}));
+    const groupCount = await Group.countDocuments(countFilter);
 
     const SavingsAccount = require('../models/SavingsAccount');
     const Loan = require('../models/Loan');
 
+    const savingsMatch = {};
+    if (orgId) savingsMatch.organizationId = orgId;
+    if (queryBranchId) savingsMatch.branchId = queryBranchId;
+
+    const loansMatch = { status: 'Disbursed' };
+    if (orgId) loansMatch.organizationId = orgId;
+    if (queryBranchId) loansMatch.branchId = queryBranchId;
+
     const savingsAggr = await SavingsAccount.aggregate([
-      { $match: { organizationId: orgId, ...(queryBranchId && { branchId: queryBranchId }) } },
+      ...(Object.keys(savingsMatch).length > 0 ? [{ $match: savingsMatch }] : []),
       { $group: { _id: null, total: { $sum: "$balance" } } }
     ]);
     const loansAggr = await Loan.aggregate([
-      { $match: { organizationId: orgId, status: 'Disbursed', ...(queryBranchId && { branchId: queryBranchId }) } },
+      { $match: loansMatch },
       { $group: { _id: null, total: { $sum: "$approvedAmount" }, count: { $sum: 1 } } }
     ]);
 
@@ -72,9 +78,9 @@ exports.getBranchDashboard = async (req, res, next) => {
     const activeLoanAccounts = loansAggr.length > 0 ? loansAggr[0].count : 0;
 
     const dashboard = {
-      branchName: branch ? branch.branchName : 'Unknown Branch',
-      branchCode: branch ? branch.branchCode : 'UNKNOWN',
-      managerName: branch?.managerName || '',
+      branchName: branch ? branch.branchName : (req.user.role === 'Super Admin' ? 'Platform All Branches' : 'Main Branch'),
+      branchCode: branch ? branch.branchCode : (req.user.role === 'Super Admin' ? 'GLOBAL' : 'MAIN'),
+      managerName: branch?.managerName || (req.user.role === 'Super Admin' ? req.user.name : ''),
       totalMembers: memberCount,
       activeMembers: memberCount,
       totalEmployees: employeeCount,
@@ -103,7 +109,10 @@ exports.getBranchesList = async (req, res, next) => {
     const { orgId } = resolveScope(req);
     const { search, status } = req.query;
 
-    let query = { organizationId: orgId, isDeleted: false };
+    let query = { isDeleted: false };
+    if (orgId) {
+      query.organizationId = orgId;
+    }
     if (status && status !== 'All') {
       query.status = status;
     }
@@ -115,7 +124,7 @@ exports.getBranchesList = async (req, res, next) => {
       ];
     }
 
-    const branches = await Branch.find(query).sort({ createdAt: -1 });
+    const branches = await Branch.find(query).populate('organizationId', 'name code').sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -132,8 +141,19 @@ exports.getBranchesList = async (req, res, next) => {
 // @access  Private (Org Admin, Super Admin)
 exports.createBranch = async (req, res, next) => {
   try {
-    const { orgId } = resolveScope(req);
-    const { branchCode, branchName, address, district, state, phone, email, workingHours, managerId, managerName } = req.body;
+    let { orgId } = resolveScope(req);
+    const { branchCode, branchName, address, district, state, phone, email, workingHours, managerId, managerName, organizationId } = req.body;
+
+    if (req.user.role === 'Super Admin' && organizationId) {
+      orgId = organizationId;
+    }
+
+    if (!orgId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Organization ID is required to create a branch.',
+      });
+    }
 
     if (!branchCode || !branchName) {
       return res.status(400).json({
@@ -145,43 +165,29 @@ exports.createBranch = async (req, res, next) => {
     const cleanCode = branchCode.trim().toUpperCase();
 
     // Check unique code within organization
-    try {
-      const existing = await Branch.findOne({ organizationId: orgId, branchCode: cleanCode, isDeleted: false });
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          error: `Branch code '${cleanCode}' already exists in your organization. Please use a unique code.`,
-        });
-      }
-    } catch (e) {}
-
-    let branch = null;
-    try {
-      branch = await Branch.create({
-        organizationId: orgId,
-        branchCode: cleanCode,
-        branchName,
-        address,
-        district,
-        state,
-        phone,
-        email,
-        workingHours: workingHours || '9:00 AM - 5:00 PM (Mon-Sat)',
-        managerId: managerId || null,
-        managerName: managerName || '',
-        createdBy: req.user._id,
-        status: 'Active',
+    const existing = await Branch.findOne({ organizationId: orgId, branchCode: cleanCode, isDeleted: false });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        error: `Branch code '${cleanCode}' already exists in this organization. Please use a unique code.`,
       });
-    } catch (dbErr) {
-      branch = {
-        _id: 'BR-' + Date.now(),
-        organizationId: orgId,
-        branchCode: cleanCode,
-        branchName,
-        district,
-        status: 'Active',
-      };
     }
+
+    const branch = await Branch.create({
+      organizationId: orgId,
+      branchCode: cleanCode,
+      branchName,
+      address,
+      district,
+      state: state || 'Karnataka',
+      phone,
+      email,
+      workingHours: workingHours || '9:00 AM - 5:00 PM (Mon-Sat)',
+      managerId: managerId || null,
+      managerName: managerName || '',
+      createdBy: req.user._id,
+      status: 'Active',
+    });
 
     await logBranchAudit(req, 'BRANCH_CREATED', `Created branch '${branchName}' (${cleanCode})`, orgId, branch._id);
 
@@ -205,25 +211,16 @@ exports.getBranchProfile = async (req, res, next) => {
 
     let branch = null;
     try {
-      branch = await Branch.findOne({ _id: branchId, organizationId: orgId });
+      const filter = { _id: branchId, isDeleted: false };
+      if (orgId) filter.organizationId = orgId;
+      branch = await Branch.findOne(filter);
     } catch (e) {}
 
     if (!branch) {
-      branch = {
-        _id: branchId,
-        organizationId: orgId,
-        branchName: 'Main Branch - JP Nagar',
-        branchCode: 'JP-01',
-        managerName: 'Mahesh Rao',
-        phone: '+91 (080) 2654-1100',
-        email: 'jpnagar@coop.org',
-        address: '100 Feet Ring Road, JP Nagar 6th Phase',
-        district: 'Bengaluru Urban',
-        state: 'Karnataka',
-        workingHours: '9:00 AM - 5:00 PM (Mon-Sat)',
-        status: 'Active',
-        createdAt: new Date('2024-01-20'),
-      };
+      return res.status(404).json({
+        success: false,
+        error: 'Branch not found',
+      });
     }
 
     return res.status(200).json({
@@ -352,13 +349,51 @@ exports.getBranchMembers = async (req, res, next) => {
 exports.getBranchReports = async (req, res, next) => {
   try {
     const { type } = req.query;
+    const { orgId } = resolveScope(req);
+    const branchId = req.params.id;
+
+    const Member = require('../models/Member');
+    const SavingsAccount = require('../models/SavingsAccount');
+    const Loan = require('../models/Loan');
+
+    const memberFilter = { isDeleted: false };
+    if (orgId) memberFilter.organizationId = orgId;
+    if (branchId) memberFilter.branchId = branchId;
+
+    const members = await Member.find(memberFilter).limit(50);
+    const memberReport = members.map((m) => ({
+      memberId: m.memberId,
+      name: m.fullName,
+      accountType: m.category,
+      savingsBalance: '—',
+      loanStatus: '—',
+    }));
+
+    const savingsAccounts = await SavingsAccount.find(memberFilter).populate('memberId', 'fullName').limit(50);
+    const savingsReport = savingsAccounts.map((s) => ({
+      accountNo: s.accountNumber,
+      memberName: s.memberId ? s.memberId.fullName : '—',
+      scheme: s.accountType || 'Savings',
+      balance: `₹ ${s.balance?.toLocaleString() || 0}`,
+      lastDeposit: s.updatedAt ? new Date(s.updatedAt).toISOString().split('T')[0] : '—',
+    }));
+
+    const loans = await Loan.find(memberFilter).populate('memberId', 'fullName').limit(50);
+    const loanReport = loans.map((l) => ({
+      loanId: l.loanId || l._id,
+      borrower: l.memberId ? l.memberId.fullName : '—',
+      loanType: l.loanType || 'Micro Loan',
+      Principal: `₹ ${l.approvedAmount?.toLocaleString() || 0}`,
+      emiAmount: `₹ ${l.emiAmount?.toLocaleString() || 0}`,
+      status: l.status,
+    }));
 
     const reports = {
       type: type || 'Member',
       generatedAt: new Date(),
-      memberReport: [],
-      savingsReport: [],
-      loanReport: [],
+      memberReport,
+      savingsReport,
+      loanReport,
     };
 
     return res.status(200).json({

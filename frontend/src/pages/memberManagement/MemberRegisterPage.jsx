@@ -6,16 +6,23 @@ import {
   Upload, 
   CheckCircle2, 
   AlertCircle, 
-  Loader2 
+  Loader2,
+  Building2 
 } from 'lucide-react';
-import { registerMemberApi, fetchBranchesList } from '../../services/api';
+import { registerMemberApi, fetchBranchesList, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberRegisterPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(true);
 
   const [formData, setFormData] = useState({
+    organizationId: '',
     fullName: '',
     gender: 'Male',
     dob: '',
@@ -45,14 +52,41 @@ const MemberRegisterPage = () => {
   const [msg, setMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+            if (res.data.data.length > 0) {
+              setFormData((prev) => ({ ...prev, organizationId: res.data.data[0]._id }));
+            }
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     const loadBranches = async () => {
+      setLoadingBranches(true);
       try {
-        const res = await fetchBranchesList();
+        const branchParams = {};
+        if (isSuperAdmin && formData.organizationId) {
+          branchParams.organizationId = formData.organizationId;
+        }
+        const res = await fetchBranchesList(branchParams);
         if (res.data && res.data.success) {
           setBranches(res.data.data);
           if (res.data.data.length > 0) {
             setFormData((prev) => ({ ...prev, branchId: res.data.data[0]._id }));
+          } else {
+            setFormData((prev) => ({ ...prev, branchId: '' }));
           }
         }
       } catch (err) {
@@ -62,7 +96,7 @@ const MemberRegisterPage = () => {
       }
     };
     loadBranches();
-  }, []);
+  }, [formData.organizationId]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -156,6 +190,30 @@ const MemberRegisterPage = () => {
             </label>
           </div>
         </div>
+
+        {/* Super Admin Organization Picker */}
+        {isSuperAdmin && (
+          <div className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
+            <label className="block text-xs font-semibold text-slate-300">Target Organization *</label>
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <select
+                name="organizationId"
+                value={formData.organizationId}
+                onChange={handleChange}
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none"
+              >
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-slate-500">Branches will dynamically populate for the selected cooperative society.</p>
+          </div>
+        )}
 
         {/* Section 1: Personal Info */}
         <div className="space-y-4">

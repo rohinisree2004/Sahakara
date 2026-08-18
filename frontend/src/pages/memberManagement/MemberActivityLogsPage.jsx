@@ -3,19 +3,48 @@ import {
   FileCheck, 
   Search, 
   User, 
-  Loader2 
+  Loader2,
+  Building2 
 } from 'lucide-react';
-import { fetchMemberLogs } from '../../services/api';
+import { fetchMemberLogs, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberActivityLogsPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     const loadLogs = async () => {
       setLoading(true);
       try {
-        const res = await fetchMemberLogs();
+        const params = {};
+        if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+          params.organizationId = selectedOrgId;
+        }
+        const res = await fetchMemberLogs(params);
         if (res.data && res.data.success) {
           setLogs(res.data.data);
         }
@@ -26,7 +55,7 @@ const MemberActivityLogsPage = () => {
       }
     };
     loadLogs();
-  }, []);
+  }, [selectedOrgId]);
 
   return (
     <div className="space-y-6">
@@ -42,6 +71,25 @@ const MemberActivityLogsPage = () => {
             Audit history tracking member enrollments, board approvals, rejection remarks, and KYC verifications
           </p>
         </div>
+
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs">
+            <Building2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-400 font-semibold">Society:</span>
+            <select
+              value={selectedOrgId}
+              onChange={(e) => setSelectedOrgId(e.target.value)}
+              className="bg-transparent text-emerald-300 font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="All" className="bg-slate-900 text-white">All Organizations</option>
+              {organizations.map((org) => (
+                <option key={org._id} value={org._id} className="bg-slate-900 text-white">
+                  {org.name} ({org.code || 'ORG'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Logs Table */}

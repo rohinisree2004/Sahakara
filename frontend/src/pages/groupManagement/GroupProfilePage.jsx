@@ -42,21 +42,18 @@ const GroupProfilePage = () => {
   }
 
   const g = group || {
-    groupId: 'GRP-2026-001',
-    groupCode: 'SHG-JP-101',
-    groupName: 'Mahila Pragati SHG',
+    groupId: 'GRP-000',
+    groupCode: 'GRP-01',
+    groupName: 'Group Profile',
     groupType: 'Self-Help Group (SHG)',
-    description: 'Women empowerment micro-savings and credit group',
+    description: 'Member Self-Help Group',
     status: 'Active',
-    totalMembers: 15,
-    branchId: { branchName: 'JP Nagar Main Branch', branchCode: 'JP-01' },
-    leaderId: { fullName: 'Sunita Bhatt', phone: '+91 99000 99887', memberId: 'MEM-2026-101' },
-    memberIds: [
-      { _id: 'M-1', fullName: 'Ganesh Bhatt', memberId: 'MEM-2026-101', phone: '+91 99000 00007', category: 'Regular Member', membershipStatus: 'Active' },
-      { _id: 'M-2', fullName: 'Rajesh Sharma', memberId: 'MEM-2026-102', phone: '+91 97410 88221', category: 'Regular Member', membershipStatus: 'Active' },
-    ],
-    savingsSummary: '₹ 1.85 Lakhs',
-    loanSummary: '₹ 3.5 Lakhs',
+    totalMembers: 0,
+    branchId: { branchName: 'Main Branch', branchCode: 'BR-01' },
+    leaderId: { fullName: 'Not Assigned', phone: 'N/A', memberId: 'N/A' },
+    memberIds: [],
+    savingsSummary: '₹ 0',
+    loanSummary: '₹ 0',
   };
 
   return (
@@ -84,7 +81,7 @@ const GroupProfilePage = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Type: <strong className="text-white">{g.groupType}</strong> • Branch: <strong className="text-teal-400">{g.branchId?.branchName || 'JP Nagar'}</strong>
+              Type: <strong className="text-white">{g.groupType}</strong> • Branch: <strong className="text-teal-400">{g.branchId?.branchName || g.branchName || 'Head Office'}</strong>
             </p>
           </div>
         </div>
@@ -104,10 +101,10 @@ const GroupProfilePage = () => {
             <div className="text-xs text-slate-400">Designated Group Leader</div>
             <div className="text-sm font-bold text-white flex items-center gap-2">
               <User className="w-4 h-4 text-teal-400" />
-              <span>{g.leaderId?.fullName || 'Sunita Bhatt'}</span>
+              <span>{g.leaderId?.fullName || 'Not Assigned'}</span>
             </div>
             <div className="text-[11px] text-slate-400 font-mono">
-              ID: {g.leaderId?.memberId || 'MEM-2026-101'} • Phone: {g.leaderId?.phone || '+91 99000 99887'}
+              ID: {g.leaderId?.memberId || 'N/A'} • Phone: {g.leaderId?.phone || 'N/A'}
             </div>
           </div>
 

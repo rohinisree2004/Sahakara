@@ -4,11 +4,19 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
-  Loader2 
+  Loader2,
+  Building2 
 } from 'lucide-react';
-import { fetchMembersList, approveMemberApi, rejectMemberApi } from '../../services/api';
+import { fetchMembersList, approveMemberApi, rejectMemberApi, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberApprovalsPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [pendingMembers, setPendingMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,10 +28,31 @@ const MemberApprovalsPage = () => {
   const [msg, setMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   const loadPending = async () => {
     setLoading(true);
     try {
-      const res = await fetchMembersList({ status: 'Pending' });
+      const params = { status: 'Pending' };
+      if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+        params.organizationId = selectedOrgId;
+      }
+      const res = await fetchMembersList(params);
       if (res.data && res.data.success) {
         setPendingMembers(res.data.data);
       }
@@ -36,7 +65,7 @@ const MemberApprovalsPage = () => {
 
   useEffect(() => {
     loadPending();
-  }, []);
+  }, [selectedOrgId]);
 
   const handleApprove = async (m) => {
     setActionLoading(true);
@@ -95,6 +124,25 @@ const MemberApprovalsPage = () => {
             Board approval desk for newly enrolled members awaiting official membership sign-off
           </p>
         </div>
+
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs">
+            <Building2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-400 font-semibold">Society:</span>
+            <select
+              value={selectedOrgId}
+              onChange={(e) => setSelectedOrgId(e.target.value)}
+              className="bg-transparent text-emerald-300 font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="All" className="bg-slate-900 text-white">All Organizations</option>
+              {organizations.map((org) => (
+                <option key={org._id} value={org._id} className="bg-slate-900 text-white">
+                  {org.name} ({org.code || 'ORG'})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {msg && (
@@ -131,10 +179,10 @@ const MemberApprovalsPage = () => {
                 </div>
 
                 <div className="space-y-1 text-xs text-slate-300 pt-2 border-t border-slate-800">
-                  <div>Category: <strong className="text-white">{m.category}</strong></div>
-                  <div>Phone: <strong className="text-white">{m.phone}</strong></div>
-                  <div>Branch: <strong className="text-emerald-400">{m.branchId?.branchName || 'JP Nagar'}</strong></div>
-                  <div>Nominee: <strong className="text-white">{m.nominee?.name || 'Sunita Bhatt'}</strong></div>
+                  <div>Category: <strong className="text-white">{m.category || 'Regular Member'}</strong></div>
+                  <div>Phone: <strong className="text-white">{m.phone || 'N/A'}</strong></div>
+                  <div>Branch: <strong className="text-emerald-400">{m.branchId?.branchName || m.branchName || 'Head Office'}</strong></div>
+                  <div>Nominee: <strong className="text-white">{m.nominee?.name || 'N/A'}</strong></div>
                 </div>
               </div>
 

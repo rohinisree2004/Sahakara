@@ -30,7 +30,6 @@ const SavingsTransactionSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Transaction ID is required'],
       unique: true,
-      index: true,
     },
     transactionType: {
       type: String,

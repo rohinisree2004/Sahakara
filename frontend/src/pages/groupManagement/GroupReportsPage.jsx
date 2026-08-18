@@ -41,10 +41,7 @@ const GroupReportsPage = () => {
     setTimeout(() => setExportMsg(''), 4000);
   };
 
-  const summaryList = data?.groupSummary || [
-    { groupCode: 'SHG-JP-101', name: 'Mahila Pragati SHG', leader: 'Sunita Bhatt', memberCount: 15, savings: '₹ 1.85 L', loans: '₹ 3.5 L' },
-    { groupCode: 'JLG-ML-202', name: 'Raitara Bandhu JLG', leader: 'Rajesh Sharma', memberCount: 10, savings: '₹ 2.4 L', loans: '₹ 5.0 L' },
-  ];
+  const summaryList = data?.groupSummary || [];
 
   return (
     <div className="space-y-6">

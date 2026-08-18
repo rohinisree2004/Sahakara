@@ -274,7 +274,7 @@ const OrgBranchesPage = () => {
                     value={formData.branchName}
                     onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
                     required
-                    placeholder="e.g. JP Nagar Branch"
+                    placeholder="e.g. Central Branch"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>

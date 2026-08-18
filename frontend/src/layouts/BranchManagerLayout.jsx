@@ -53,7 +53,9 @@ const BranchManagerLayout = () => {
               <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1">
                 SAHAKARA <span className="text-teal-400 text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 font-mono">BRANCH</span>
               </span>
-              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">JP Nagar Branch (JP-01)</p>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">
+                {user?.branchId?.branchName || (user?.role === 'Super Admin' ? 'Master Control' : 'Branch Desk')}
+              </p>
             </div>
           </Link>
 
@@ -69,9 +71,9 @@ const BranchManagerLayout = () => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                    `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                       isActive
-                        ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300 shadow-sm font-bold'
+                        ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                     }`
                   }
@@ -80,17 +82,18 @@ const BranchManagerLayout = () => {
                     <Icon className="w-4 h-4 text-teal-400" />
                     <span>{item.label}</span>
                   </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
                 </NavLink>
               );
             })}
           </nav>
         </div>
 
-        {/* User Profile Card & Logout */}
-        <div className="pt-4 border-t border-slate-800/80 space-y-3">
-          <div className="flex items-center gap-3 px-2 py-1.5">
-            <div className="w-9 h-9 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
-              <User className="w-5 h-5" />
+        {/* User Session Card */}
+        <div className="p-3 bg-slate-950/60 rounded-2xl border border-slate-800/80 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 font-mono font-bold text-xs">
+              <User className="w-4 h-4" />
             </div>
             <div className="overflow-hidden">
               <div className="text-xs font-bold text-white truncate">{user?.name || 'Branch Manager'}</div>
@@ -124,9 +127,9 @@ const BranchManagerLayout = () => {
             </button>
 
             <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
-              <span className="font-semibold text-white">Vijaya Credit Co-op</span>
+              <span className="font-semibold text-white">{user?.organizationId?.name || 'Sahakara ERP'}</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-              <span className="text-teal-400 font-mono font-bold">JP Nagar Main Branch (JP-01)</span>
+              <span className="text-teal-400 font-mono font-bold">{user?.branchId?.branchName || 'Branch Operations'}</span>
             </div>
           </div>
 

@@ -42,19 +42,9 @@ const BranchReportsPage = () => {
     setTimeout(() => setExportMsg(''), 4000);
   };
 
-  const memberReportList = data?.memberReport || [
-    { memberId: 'M-101', name: 'Ganesh Bhatt', accountType: 'Regular', savingsBalance: '₹ 45,000', loanStatus: 'Active (₹ 1.2 L)' },
-    { memberId: 'M-102', name: 'Rajesh Sharma', accountType: 'Regular', savingsBalance: '₹ 82,500', loanStatus: 'None' },
-  ];
-
-  const savingsReportList = data?.savingsReport || [
-    { accountNo: 'SA-4001', memberName: 'Ganesh Bhatt', scheme: 'Daily Savings', balance: '₹ 45,000', lastDeposit: '2024-05-18' },
-    { accountNo: 'SA-4002', memberName: 'Rajesh Sharma', scheme: 'Recurring Deposit', balance: '₹ 82,500', lastDeposit: '2024-05-20' },
-  ];
-
-  const loanReportList = data?.loanReport || [
-    { loanId: 'LN-701', borrower: 'Ganesh Bhatt', loanType: 'Personal Loan', Principal: '₹ 1,20,000', emiAmount: '₹ 4,500', status: 'Current' },
-  ];
+  const memberReportList = data?.memberReport || [];
+  const savingsReportList = data?.savingsReport || [];
+  const loanReportList = data?.loanReport || [];
 
   return (
     <div className="space-y-6">

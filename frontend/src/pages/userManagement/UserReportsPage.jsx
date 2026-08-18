@@ -41,17 +41,8 @@ const UserReportsPage = () => {
     setTimeout(() => setExportMsg(''), 4000);
   };
 
-  const activeUsersList = data?.activeUsers || [
-    { userId: 'U-101', name: 'Vijaya Society Admin', role: 'Organization Admin', branch: 'Head Office', status: 'Active' },
-    { userId: 'U-102', name: 'Ramesh Patil', role: 'President', branch: 'Head Office', status: 'Active' },
-    { userId: 'U-103', name: 'Mahesh Rao', role: 'Employee', branch: 'JP Nagar Branch', status: 'Active' },
-  ];
-
-  const branchWiseList = data?.branchWiseUsers || [
-    { branchName: 'JP Nagar Branch (JP-01)', staffCount: 6, memberCount: 850 },
-    { branchName: 'Malleshwaram Extension (ML-02)', staffCount: 4, memberCount: 620 },
-    { branchName: 'Whitefield Tech Hub (WF-03)', staffCount: 5, memberCount: 980 },
-  ];
+  const activeUsersList = data?.activeUsers || [];
+  const branchWiseList = data?.branchWiseUsers || [];
 
   return (
     <div className="space-y-6">

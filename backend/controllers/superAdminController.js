@@ -257,24 +257,163 @@ exports.getAllOrganizations = async (req, res, next) => {
   }
 };
 
-// @desc    Get Single Organization Full Details Page
+// @desc    Create New Organization Directly (Super Admin)
+// @route   POST /api/v1/super-admin/organizations
+// @access  Private (Super Admin)
+exports.createOrganization = async (req, res, next) => {
+  try {
+    const { name, code, registrationNumber, societyType, email, phone, address, state, city, pincode, adminName, adminPassword } = req.body;
+
+    if (!name || !email || !phone || !state) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide Organization Name, Email, Phone, and State.',
+      });
+    }
+
+    // Auto-generate code if not provided
+    let orgCode = code;
+    if (!orgCode) {
+      const codePrefix = name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .substring(0, 3)
+        .toUpperCase();
+      orgCode = `${codePrefix}-${Math.floor(100 + Math.random() * 900)}`;
+    } else {
+      orgCode = orgCode.toUpperCase().trim();
+    }
+
+    // Check unique name or code
+    const existingOrg = await Organization.findOne({
+      $or: [{ name: name.trim() }, { code: orgCode }],
+      isDeleted: false,
+    });
+    if (existingOrg) {
+      return res.status(400).json({
+        success: false,
+        error: `Organization with name '${name}' or code '${orgCode}' already exists.`,
+      });
+    }
+
+    const organization = await Organization.create({
+      name: name.trim(),
+      code: orgCode,
+      registrationNumber: registrationNumber || '',
+      societyType: societyType || 'Credit Cooperative',
+      email: email.toLowerCase().trim(),
+      phone: phone.trim(),
+      address: address || '',
+      state: state.trim(),
+      city: city || '',
+      pincode: pincode || '',
+      status: 'Active',
+      approvedBy: req.user._id,
+      approvedAt: new Date(),
+    });
+
+    // Provision default Organization Admin
+    const username = `admin_${orgCode.toLowerCase().replace('-', '')}`;
+    const adminUser = await User.create({
+      name: adminName || `${name} Admin`,
+      email: email.toLowerCase().trim(),
+      username,
+      password: adminPassword || 'password123',
+      role: 'Organization Admin',
+      organizationId: organization._id,
+      phone: phone.trim(),
+      isActive: true,
+    });
+
+    organization.adminUserId = adminUser._id;
+    await organization.save({ validateBeforeSave: false });
+
+    await logAuditEvent(
+      req,
+      'ORG_CREATED',
+      `Super Admin created organization '${name}' (${orgCode})`,
+      organization._id
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `Organization '${name}' created successfully with Admin username '${username}'.`,
+      data: organization,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update Organization Profile Details (Super Admin)
+// @route   PUT /api/v1/super-admin/organizations/:id
+// @access  Private (Super Admin)
+exports.updateOrganization = async (req, res, next) => {
+  try {
+    const orgId = req.params.id;
+    const { name, code, registrationNumber, societyType, email, phone, address, state, city, pincode, status } = req.body;
+
+    const org = await Organization.findById(orgId);
+    if (!org) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+
+    if (name) org.name = name.trim();
+    if (code) org.code = code.toUpperCase().trim();
+    if (registrationNumber !== undefined) org.registrationNumber = registrationNumber;
+    if (societyType) org.societyType = societyType;
+    if (email) org.email = email.toLowerCase().trim();
+    if (phone) org.phone = phone.trim();
+    if (address !== undefined) org.address = address;
+    if (state) org.state = state.trim();
+    if (city !== undefined) org.city = city;
+    if (pincode !== undefined) org.pincode = pincode;
+    if (status) org.status = status;
+
+    await org.save();
+
+    await logAuditEvent(
+      req,
+      'ORG_UPDATED',
+      `Super Admin updated organization profile for '${org.name}' (${org.code})`,
+      org._id
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Organization '${org.name}' updated successfully.`,
+      data: org,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get Single Organization Full Details Page with Branches & Users
 // @route   GET /api/v1/super-admin/organizations/:id
 // @access  Private (Super Admin)
 exports.getOrganizationDetails = async (req, res, next) => {
   try {
     const orgId = req.params.id;
-    let org = await Organization.findById(orgId);
+    let org = await Organization.findById(orgId).populate('adminUserId', 'name email username phone');
     
     if (!org) {
       return res.status(404).json({ success: false, error: 'Organization not found' });
     }
 
-    let memberCount = await User.countDocuments({ organizationId: org._id, role: 'Member' });
-    let employeeCount = await User.countDocuments({ organizationId: org._id, role: 'Employee' });
-    let branchCount = await require('../models/Branch').countDocuments({ organizationId: org._id, isDeleted: false });
-
+    const Branch = require('../models/Branch');
+    const Member = require('../models/Member');
     const SavingsAccount = require('../models/SavingsAccount');
     const Loan = require('../models/Loan');
+
+    const [memberCount, employeeCount, branchCount, branches, users] = await Promise.all([
+      Member.countDocuments({ organizationId: org._id }),
+      User.countDocuments({ organizationId: org._id, isDeleted: false }),
+      Branch.countDocuments({ organizationId: org._id, isDeleted: false }),
+      Branch.find({ organizationId: org._id, isDeleted: false }).sort({ createdAt: -1 }),
+      User.find({ organizationId: org._id, isDeleted: false }).select('-password').populate('branchId', 'branchName branchCode').sort({ createdAt: -1 }),
+    ]);
 
     const savingsAggr = await SavingsAccount.aggregate([
       { $match: { organizationId: org._id } },
@@ -298,6 +437,8 @@ exports.getOrganizationDetails = async (req, res, next) => {
         totalLoansDisbursed: `₹ ${totalLoans.toLocaleString()}`,
         auditComplianceScore: '98%',
       },
+      branches,
+      users,
     };
 
     return res.status(200).json({
@@ -317,14 +458,12 @@ exports.updateOrganizationStatus = async (req, res, next) => {
     const { status, isDeleted } = req.body;
     const orgId = req.params.id;
 
-    try {
-      const org = await Organization.findById(orgId);
-      if (org) {
-        if (status) org.status = status;
-        if (typeof isDeleted === 'boolean') org.isDeleted = isDeleted;
-        await org.save();
-      }
-    } catch (e) {}
+    const org = await Organization.findById(orgId);
+    if (org) {
+      if (status) org.status = status;
+      if (typeof isDeleted === 'boolean') org.isDeleted = isDeleted;
+      await org.save();
+    }
 
     await logAuditEvent(
       req,

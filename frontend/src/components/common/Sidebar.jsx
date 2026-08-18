@@ -21,7 +21,8 @@ import {
   Calculator,
   PieChart,
   ArrowRightLeft,
-  Calendar
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 const Sidebar = ({ onCloseMobile }) => {
@@ -66,16 +67,28 @@ const Sidebar = ({ onCloseMobile }) => {
       roles: ['Super Admin', 'Organization Admin', 'Branch Manager', 'President', 'Secretary', 'Treasurer', 'Employee', 'Member'],
     },
     {
-      label: 'Platform Governance',
+      label: 'Organizations Registry',
+      path: '/super-admin/organizations',
+      icon: Building2,
+      roles: ['Super Admin'],
+    },
+    {
+      label: 'Pending Approvals',
       path: '/super-admin/approvals',
       icon: ShieldAlert,
+      roles: ['Super Admin'],
+    },
+    {
+      label: 'Platform Monitoring',
+      path: '/super-admin/monitoring',
+      icon: Activity,
       roles: ['Super Admin'],
     },
     {
       label: 'Organization Profile',
       path: '/org-admin/profile',
       icon: Building2,
-      roles: ['Super Admin', 'Organization Admin', 'President', 'Secretary', 'Treasurer'],
+      roles: ['Organization Admin', 'President', 'Secretary', 'Treasurer'],
     },
     {
       label: 'Branch Management',
@@ -150,16 +163,28 @@ const Sidebar = ({ onCloseMobile }) => {
       roles: ['Super Admin', 'Organization Admin', 'President', 'Secretary', 'Treasurer', 'Employee'],
     },
     {
+      label: 'Global Audit Logs',
+      path: '/super-admin/audit-logs',
+      icon: FileCheck,
+      roles: ['Super Admin'],
+    },
+    {
       label: 'Audit Trail Logs',
       path: '/users/logs',
       icon: FileCheck,
-      roles: ['Super Admin', 'Organization Admin', 'President', 'Secretary', 'Treasurer'],
+      roles: ['Organization Admin', 'President', 'Secretary', 'Treasurer'],
+    },
+    {
+      label: 'Platform Settings',
+      path: '/super-admin/settings',
+      icon: Settings,
+      roles: ['Super Admin'],
     },
     {
       label: 'Society Settings',
       path: '/org-admin/settings',
       icon: Settings,
-      roles: ['Super Admin', 'Organization Admin'],
+      roles: ['Organization Admin'],
     },
   ];
 
@@ -167,56 +192,56 @@ const Sidebar = ({ onCloseMobile }) => {
   const allowedMenuItems = allMenuItems.filter((item) => item.roles.includes(role));
 
   return (
-    <div className="flex flex-col justify-between h-full p-4 bg-slate-900/90 text-slate-100 font-sans">
+    <div className="flex flex-col h-full bg-slate-900/95 text-slate-100 font-sans select-none overflow-hidden">
       
-      <div className="space-y-6">
-        {/* Brand Header */}
-        <Link to="/" className="flex items-center gap-3 px-2 py-2 group" onClick={onCloseMobile}>
-          <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+      {/* Brand Header - Fixed at Top */}
+      <div className="p-4 pb-3 shrink-0 border-b border-slate-800/80">
+        <Link to="/" className="flex items-center gap-3 px-1 py-1 group" onClick={onCloseMobile}>
+          <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
             <Building2 className="w-6 h-6" />
           </div>
-          <div>
+          <div className="overflow-hidden">
             <span className="text-lg font-extrabold tracking-tight text-white flex items-center gap-1">
               SAHAKARA <span className="text-emerald-400 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 font-mono">ERP</span>
             </span>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Multi-Coop ERP Platform</p>
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Multi-Coop ERP Platform</p>
           </div>
         </Link>
-
-        {/* Dynamic RBAC Navigation Menu */}
-        <nav className="space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            ERP Navigation Matrix
-          </div>
-
-          {allowedMenuItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={onCloseMobile}
-                className={({ isActive }) =>
-                  `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    isActive
-                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shadow-sm font-bold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`
-                }
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className="w-4 h-4 text-emerald-400" />
-                  <span>{item.label}</span>
-                </div>
-              </NavLink>
-            );
-          })}
-        </nav>
       </div>
 
-      {/* User Session Footer */}
-      <div className="pt-4 border-t border-slate-800/80 space-y-3">
-        <div className="flex items-center gap-3 px-2 py-1.5">
+      {/* Dynamic RBAC Navigation Menu - Scrollable Middle */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 min-h-0">
+        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          ERP Navigation Matrix
+        </div>
+
+        {allowedMenuItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              onClick={onCloseMobile}
+              className={({ isActive }) =>
+                `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                  isActive
+                    ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <div className="flex items-center gap-3">
+                <Icon className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </div>
+            </NavLink>
+          );
+        })}
+      </div>
+
+      {/* User Session Footer - Fixed at Bottom */}
+      <div className="p-4 pt-3 shrink-0 border-t border-slate-800/80 space-y-3 bg-slate-900/95">
+        <div className="flex items-center gap-3 px-1 py-1">
           <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
             <User className="w-5 h-5" />
           </div>

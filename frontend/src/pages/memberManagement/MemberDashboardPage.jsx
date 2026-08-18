@@ -9,19 +9,49 @@ import {
   TrendingUp, 
   Loader2, 
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Building2
 } from 'lucide-react';
-import { fetchMemberDashboard } from '../../services/api';
+import { fetchMemberDashboard, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberDashboardPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     const loadDashboard = async () => {
+      setLoading(true);
       try {
-        const res = await fetchMemberDashboard();
+        const params = {};
+        if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+          params.organizationId = selectedOrgId;
+        }
+        const res = await fetchMemberDashboard(params);
         if (res.data && res.data.success) {
           setData(res.data.data);
           setError(null);
@@ -33,7 +63,7 @@ const MemberDashboardPage = () => {
       }
     };
     loadDashboard();
-  }, []);
+  }, [selectedOrgId]);
 
   if (loading) {
     return (
@@ -86,13 +116,33 @@ const MemberDashboardPage = () => {
             </p>
           </div>
 
-          <Link
-            to="/members/register"
-            className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>New Member Enrollment</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5">
+                <Building2 className="w-4 h-4 text-emerald-400" />
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="bg-transparent text-emerald-300 text-xs font-bold focus:outline-none cursor-pointer"
+                >
+                  <option value="All" className="bg-slate-900 text-white">All Organizations (Global)</option>
+                  {organizations.map((org) => (
+                    <option key={org._id} value={org._id} className="bg-slate-900 text-white">
+                      {org.name} ({org.code || 'ORG'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <Link
+              to="/members/register"
+              className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>New Member Enrollment</span>
+            </Link>
+          </div>
         </div>
       </div>
 

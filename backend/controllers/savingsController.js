@@ -26,14 +26,23 @@ const generateTransactionId = async (organizationId, typeCode = 'TXN') => {
 // @access  Private (Org Admin, Branch Manager, Employee)
 exports.getSavingsDashboardStats = async (req, res, next) => {
   try {
-    const { organizationId, role } = req.user;
-    let matchQuery = { organizationId: mongoose.Types.ObjectId(organizationId) };
-    let txnMatchQuery = { organizationId: mongoose.Types.ObjectId(organizationId), status: 'Completed' };
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = (roleName === 'Super Admin' && req.query.organizationId) 
+      ? req.query.organizationId 
+      : req.user.organizationId;
+
+    let matchQuery = {};
+    let txnMatchQuery = { status: 'Completed' };
+
+    if (organizationId) {
+      matchQuery.organizationId = new mongoose.Types.ObjectId(organizationId);
+      txnMatchQuery.organizationId = new mongoose.Types.ObjectId(organizationId);
+    }
 
     // If user is branch scoped
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
-      matchQuery.branchId = mongoose.Types.ObjectId(req.user.branchId);
-      txnMatchQuery.branchId = mongoose.Types.ObjectId(req.user.branchId);
+    if (req.user.branchId && roleName !== 'Super Admin' && roleName !== 'Organization Admin' && roleName !== 'President' && roleName !== 'Secretary' && roleName !== 'Treasurer') {
+      matchQuery.branchId = new mongoose.Types.ObjectId(req.user.branchId);
+      txnMatchQuery.branchId = new mongoose.Types.ObjectId(req.user.branchId);
     }
 
     // Total Savings (Sum of currentBalance)
@@ -160,16 +169,24 @@ exports.createSavingsAccount = async (req, res, next) => {
 // @access  Private
 exports.getSavingsAccounts = async (req, res, next) => {
   try {
-    const { organizationId, role } = req.user;
-    let query = { organizationId };
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = (roleName === 'Super Admin' && req.query.organizationId) 
+      ? req.query.organizationId 
+      : req.user.organizationId;
+
+    let query = {};
+    if (organizationId) {
+      query.organizationId = organizationId;
+    }
 
     // Apply branch scope if applicable
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
+    const isOrgLevel = roleName === 'Super Admin' || roleName === 'Organization Admin' || roleName === 'President' || roleName === 'Secretary' || roleName === 'Treasurer';
+    if (req.user.branchId && !isOrgLevel) {
       query.branchId = req.user.branchId;
     }
 
     // Filters
-    if (req.query.branchId && (!req.user.branchId || role.name === 'Organization Admin' || role.name === 'Super Admin')) {
+    if (req.query.branchId && (!req.user.branchId || isOrgLevel)) {
       query.branchId = req.query.branchId;
     }
     if (req.query.status) query.status = req.query.status;
@@ -184,6 +201,7 @@ exports.getSavingsAccounts = async (req, res, next) => {
     const accounts = await SavingsAccount.find(query)
       .populate('memberId', 'fullName memberId phone profileImage')
       .populate('branchId', 'branchName branchCode')
+      .populate('organizationId', 'name code')
       .sort({ createdAt: -1 })
       .skip(startIndex)
       .limit(limit);
@@ -206,17 +224,26 @@ exports.getSavingsAccounts = async (req, res, next) => {
 // @access  Private
 exports.getSavingsAccountById = async (req, res, next) => {
   try {
-    const { organizationId, role } = req.user;
-    let query = { _id: req.params.id, organizationId };
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = (roleName === 'Super Admin' && req.query.organizationId) 
+      ? req.query.organizationId 
+      : req.user.organizationId;
+
+    let query = { _id: req.params.id };
+    if (organizationId) {
+      query.organizationId = organizationId;
+    }
 
     // Strict isolation check
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
+    const isOrgLevel = roleName === 'Super Admin' || roleName === 'Organization Admin' || roleName === 'President' || roleName === 'Secretary' || roleName === 'Treasurer';
+    if (req.user.branchId && !isOrgLevel) {
       query.branchId = req.user.branchId;
     }
 
     const account = await SavingsAccount.findOne(query)
       .populate('memberId', 'fullName memberId phone email address dob joinDate category profileImage')
       .populate('branchId', 'branchName branchCode address')
+      .populate('organizationId', 'name code')
       .populate('createdBy', 'firstName lastName email');
 
     if (!account) {
@@ -241,14 +268,20 @@ exports.recordDeposit = async (req, res, next) => {
   
   try {
     const { accountId, amount, paymentMethod, referenceNumber, paymentDate, remarks } = req.body;
-    const { organizationId, role } = req.user;
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = req.user.organizationId || req.body.organizationId;
 
     if (amount <= 0) {
       throw new Error('Deposit amount must be greater than 0');
     }
 
-    let query = { _id: accountId, organizationId };
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
+    let query = { _id: accountId };
+    if (organizationId) {
+      query.organizationId = organizationId;
+    }
+
+    const isOrgLevel = roleName === 'Super Admin' || roleName === 'Organization Admin' || roleName === 'President' || roleName === 'Secretary' || roleName === 'Treasurer';
+    if (req.user.branchId && !isOrgLevel) {
       query.branchId = req.user.branchId;
     }
 
@@ -261,6 +294,7 @@ exports.recordDeposit = async (req, res, next) => {
       throw new Error(`Cannot deposit to ${account.status} account`);
     }
 
+    const targetOrgId = account.organizationId;
     const newBalance = account.currentBalance + Number(amount);
     
     // Update account balance
@@ -269,9 +303,9 @@ exports.recordDeposit = async (req, res, next) => {
     await account.save({ session });
 
     // Create transaction
-    const transactionId = await generateTransactionId(organizationId, 'DEP');
+    const transactionId = await generateTransactionId(targetOrgId, 'DEP');
     const transaction = await SavingsTransaction.create([{
-      organizationId,
+      organizationId: targetOrgId,
       branchId: account.branchId,
       savingsAccountId: account._id,
       memberId: account.memberId,
@@ -287,7 +321,7 @@ exports.recordDeposit = async (req, res, next) => {
     }], { session });
 
     await AuditLog.create([{
-      organizationId,
+      organizationId: targetOrgId,
       userId: req.user._id,
       action: 'RECORD_DEPOSIT',
       module: 'Savings Management',
@@ -302,11 +336,11 @@ exports.recordDeposit = async (req, res, next) => {
     // Post to Accounting (Module 13 Integration)
     // ----------------------------------------------------
     try {
-      const cashAcc = await getAccountByCode(organizationId, '1000');
-      const savingsPayableAcc = await getAccountByCode(organizationId, '2000');
+      const cashAcc = await getAccountByCode(targetOrgId, '1000');
+      const savingsPayableAcc = await getAccountByCode(targetOrgId, '2000');
       if (cashAcc && savingsPayableAcc) {
         await recordTransaction({
-          organizationId,
+          organizationId: targetOrgId,
           branchId: account.branchId,
           memberId: account.memberId,
           sourceModule: 'SavingsDeposit',
@@ -348,15 +382,23 @@ exports.recordDeposit = async (req, res, next) => {
 // @access  Private
 exports.getSavingsTransactions = async (req, res, next) => {
   try {
-    const { organizationId, role } = req.user;
-    let query = { organizationId };
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = (roleName === 'Super Admin' && req.query.organizationId) 
+      ? req.query.organizationId 
+      : req.user.organizationId;
 
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
+    let query = {};
+    if (organizationId) {
+      query.organizationId = organizationId;
+    }
+
+    const isOrgLevel = roleName === 'Super Admin' || roleName === 'Organization Admin' || roleName === 'President' || roleName === 'Secretary' || roleName === 'Treasurer';
+    if (req.user.branchId && !isOrgLevel) {
       query.branchId = req.user.branchId;
     }
 
     // Filters
-    if (req.query.branchId && (!req.user.branchId || role.name === 'Organization Admin')) {
+    if (req.query.branchId && (!req.user.branchId || isOrgLevel)) {
       query.branchId = req.query.branchId;
     }
     if (req.query.memberId) query.memberId = req.query.memberId;
@@ -382,7 +424,7 @@ exports.getSavingsTransactions = async (req, res, next) => {
     const transactions = await SavingsTransaction.find(query)
       .populate('memberId', 'fullName memberId')
       .populate('savingsAccountId', 'accountNumber accountType')
-      .populate('createdBy', 'firstName lastName')
+      .populate('createdBy', 'firstName lastName name')
       .sort({ transactionDate: -1, createdAt: -1 })
       .skip(startIndex)
       .limit(limit);
@@ -405,11 +447,19 @@ exports.getSavingsTransactions = async (req, res, next) => {
 // @access  Private
 exports.getPassbook = async (req, res, next) => {
   try {
-    const { organizationId, role } = req.user;
+    const roleName = typeof req.user.role === 'string' ? req.user.role : req.user.role?.name || '';
+    const organizationId = (roleName === 'Super Admin' && req.query.organizationId) 
+      ? req.query.organizationId 
+      : req.user.organizationId;
     
     // First verify account access
-    let query = { _id: req.params.accountId, organizationId };
-    if (req.user.branchId && role.name !== 'Super Admin' && role.name !== 'Organization Admin') {
+    let query = { _id: req.params.accountId };
+    if (organizationId) {
+      query.organizationId = organizationId;
+    }
+
+    const isOrgLevel = roleName === 'Super Admin' || roleName === 'Organization Admin' || roleName === 'President' || roleName === 'Secretary' || roleName === 'Treasurer';
+    if (req.user.branchId && !isOrgLevel) {
       query.branchId = req.user.branchId;
     }
 
@@ -422,7 +472,7 @@ exports.getPassbook = async (req, res, next) => {
     }
 
     // Member self-access check
-    if (role.name === 'Member' && account.memberId._id.toString() !== req.user.memberId?.toString()) {
+    if (roleName === 'Member' && account.memberId._id.toString() !== req.user.memberId?.toString()) {
         return res.status(403).json({ success: false, error: 'Access denied to this passbook' });
     }
 

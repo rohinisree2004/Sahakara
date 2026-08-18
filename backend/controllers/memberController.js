@@ -6,10 +6,10 @@ const AuditLog = require('../models/AuditLog');
 
 // Helper to resolve orgId from request context
 const getOrgId = (req) => {
-  if (req.user.role === 'Super Admin' && req.query.organizationId) {
-    return req.query.organizationId;
+  if (req.user.role === 'Super Admin') {
+    return req.query.organizationId || req.body.organizationId || null;
   }
-  return req.user.organizationId || '65e111111111111111111111';
+  return req.user.organizationId || null;
 };
 
 // Helper to log member audit events
@@ -33,40 +33,43 @@ const logMemberAudit = async (req, action, details, orgId) => {
 exports.getMemberDashboard = async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
+    const query = { isDeleted: false };
+    if (orgId) query.organizationId = orgId;
 
     let totalMembers = 0;
     let activeMembers = 0;
     let pendingMembers = 0;
     let suspendedMembers = 0;
     let newThisMonth = 0;
+    let regularMembers = 0;
+    let associateMembers = 0;
+    let nominalMembers = 0;
 
     try {
-      totalMembers = await Member.countDocuments({ organizationId: orgId, isDeleted: false });
-      activeMembers = await Member.countDocuments({ organizationId: orgId, membershipStatus: 'Active', isDeleted: false });
-      pendingMembers = await Member.countDocuments({ organizationId: orgId, membershipStatus: 'Pending', isDeleted: false });
-      suspendedMembers = await Member.countDocuments({ organizationId: orgId, membershipStatus: 'Suspended', isDeleted: false });
+      totalMembers = await Member.countDocuments(query);
+      activeMembers = await Member.countDocuments({ ...query, membershipStatus: 'Active' });
+      pendingMembers = await Member.countDocuments({ ...query, membershipStatus: 'Pending' });
+      suspendedMembers = await Member.countDocuments({ ...query, membershipStatus: 'Suspended' });
 
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      newThisMonth = await Member.countDocuments({ organizationId: orgId, createdAt: { $gte: startOfMonth }, isDeleted: false });
+      newThisMonth = await Member.countDocuments({ ...query, createdAt: { $gte: startOfMonth } });
+
+      regularMembers = await Member.countDocuments({ ...query, category: 'Regular Member' });
+      associateMembers = await Member.countDocuments({ ...query, category: 'Associate Member' });
+      nominalMembers = await Member.countDocuments({ ...query, category: 'Nominal Member' });
     } catch (e) {}
 
     const dashboard = {
-      totalMembers: totalMembers || 2450,
-      activeMembers: activeMembers || 2210,
-      pendingApprovals: pendingMembers || 18,
-      suspendedMembers: suspendedMembers || 12,
-      newThisMonth: newThisMonth || 42,
-      membershipGrowthTrend: [
-        { month: 'Jan', count: 2100 },
-        { month: 'Feb', count: 2200 },
-        { month: 'Mar', count: 2310 },
-        { month: 'Apr', count: 2400 },
-        { month: 'May', count: 2450 },
-      ],
+      totalMembers,
+      activeMembers,
+      pendingApprovals: pendingMembers,
+      suspendedMembers,
+      newThisMonth,
+      membershipGrowthTrend: [],
       categoryDistribution: {
-        regularMembers: 1980,
-        associateMembers: 390,
-        nominalMembers: 80,
+        regularMembers,
+        associateMembers,
+        nominalMembers,
       },
     };
 
@@ -87,7 +90,8 @@ exports.getMembersList = async (req, res, next) => {
     const orgId = getOrgId(req);
     const { search, status, branchId, category } = req.query;
 
-    let query = { organizationId: orgId, isDeleted: false };
+    let query = { isDeleted: false };
+    if (orgId) query.organizationId = orgId;
     if (status && status !== 'All') query.membershipStatus = status;
     if (branchId && branchId !== 'All') query.branchId = branchId;
     if (category && category !== 'All') query.category = category;
@@ -101,7 +105,10 @@ exports.getMembersList = async (req, res, next) => {
       ];
     }
 
-    const members = await Member.find(query).populate('branchId', 'branchName').sort({ createdAt: -1 });
+    const members = await Member.find(query)
+      .populate('branchId', 'branchName branchCode')
+      .populate('organizationId', 'name code')
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -147,55 +154,58 @@ exports.registerMember = async (req, res, next) => {
       });
     }
 
+    let finalOrgId = orgId;
+    let branch = branchId || null;
+
+    if (!branch && finalOrgId) {
+      const defaultBranch = await Branch.findOne({ organizationId: finalOrgId, isDeleted: false });
+      if (defaultBranch) branch = defaultBranch._id;
+    }
+
+    if (branch && !finalOrgId) {
+      const foundBranch = await Branch.findById(branch);
+      if (foundBranch) finalOrgId = foundBranch.organizationId;
+    }
+
+    if (!finalOrgId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please select an organization or branch to register this member under.',
+      });
+    }
+
     // Auto Generate Unique Member ID: MEM-2026-XXX
     let generatedMemberId = `MEM-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
-    let newMember = null;
-    try {
-      let branch = branchId;
-      if (!branch) {
-        const defaultBranch = await Branch.findOne({ organizationId: orgId, isDeleted: false });
-        branch = defaultBranch ? defaultBranch._id : '65e222222222222222222221';
-      }
-
-      newMember = await Member.create({
-        organizationId: orgId,
-        branchId: branch,
-        memberId: generatedMemberId,
-        fullName,
-        gender: gender || 'Male',
-        dob: dob || null,
-        phone,
-        email: email || '',
-        address: address || '',
-        district: district || '',
-        state: state || 'Karnataka',
-        pincode: pincode || '',
-        occupation: occupation || 'Business',
-        category: category || 'Regular Member',
-        nominee: {
-          name: nomineeName || '',
-          relationship: nomineeRelationship || '',
-          sharePercentage: Number(nomineeShare) || 100,
-          phone: nomineePhone || '',
-        },
-        kycDocuments: {
-          aadhaarNumber: aadhaarNumber || '',
-          panNumber: panNumber || '',
-          kycVerified: false,
-        },
-        membershipStatus: 'Pending',
-        createdBy: req.user._id,
-      });
-    } catch (dbErr) {
-      newMember = {
-        _id: 'MEM-' + Date.now(),
-        memberId: generatedMemberId,
-        fullName,
-        phone,
-        membershipStatus: 'Pending',
-      };
-    }
+    const newMember = await Member.create({
+      organizationId: finalOrgId,
+      branchId: branch,
+      memberId: generatedMemberId,
+      fullName,
+      gender: gender || 'Male',
+      dob: dob || null,
+      phone,
+      email: email || '',
+      address: address || '',
+      district: district || '',
+      state: state || 'Karnataka',
+      pincode: pincode || '',
+      occupation: occupation || 'Business',
+      category: category || 'Regular Member',
+      nominee: {
+        name: nomineeName || '',
+        relationship: nomineeRelationship || '',
+        sharePercentage: Number(nomineeShare) || 100,
+        phone: nomineePhone || '',
+      },
+      kycDocuments: {
+        aadhaarNumber: aadhaarNumber || '',
+        panNumber: panNumber || '',
+        kycVerified: false,
+      },
+      membershipStatus: 'Pending',
+      createdBy: req.user._id,
+    });
 
     await logMemberAudit(req, 'MEMBER_REGISTERED', `Enrolled new member '${fullName}' (${generatedMemberId})`, orgId);
 
@@ -424,12 +434,54 @@ exports.softDeleteMember = async (req, res, next) => {
 exports.getMemberReports = async (req, res, next) => {
   try {
     const { reportType } = req.query;
+    const orgId = getOrgId(req);
+
+    const filter = { isDeleted: false };
+    if (orgId) filter.organizationId = orgId;
+
+    const members = await Member.find(filter)
+      .select('memberId fullName category membershipStatus branchId')
+      .populate('branchId', 'branchName branchCode')
+      .limit(50);
+
+    const activeMembers = members.map((m) => ({
+      memberId: m.memberId,
+      name: m.fullName,
+      category: m.category,
+      branch: m.branchId ? m.branchId.branchName : 'Head Office',
+      status: m.membershipStatus,
+    }));
+
+    const branchGrowthAgg = await Member.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$branchId",
+          memberCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const populatedGrowth = await Promise.all(
+      branchGrowthAgg.map(async (item) => {
+        let bName = 'Head Office / Unassigned';
+        if (item._id) {
+          const br = await Branch.findById(item._id);
+          if (br) bName = br.branchName;
+        }
+        return {
+          branchName: bName,
+          memberCount: item.memberCount,
+          activeSavings: '—',
+        };
+      })
+    );
 
     const reports = {
       type: reportType || 'ActiveMembers',
       generatedAt: new Date(),
-      activeMembers: [],
-      branchGrowth: [],
+      activeMembers,
+      branchGrowth: populatedGrowth,
     };
 
     return res.status(200).json({

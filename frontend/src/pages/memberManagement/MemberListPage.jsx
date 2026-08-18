@@ -9,11 +9,19 @@ import {
   Power, 
   Trash2, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  Building2 
 } from 'lucide-react';
-import { fetchMembersList, toggleMemberStatusApi, deleteMemberApi, fetchBranchesList } from '../../services/api';
+import { fetchMembersList, toggleMemberStatusApi, deleteMemberApi, fetchBranchesList, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberListPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [members, setMembers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,12 +32,37 @@ const MemberListPage = () => {
 
   const [msg, setMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   const loadMembers = async () => {
     setLoading(true);
     try {
+      const memberParams = { search, status: statusFilter, branchId: branchFilter, category: categoryFilter };
+      const branchParams = {};
+
+      if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+        memberParams.organizationId = selectedOrgId;
+        branchParams.organizationId = selectedOrgId;
+      }
+
       const [mRes, bRes] = await Promise.all([
-        fetchMembersList({ search, status: statusFilter, branchId: branchFilter, category: categoryFilter }),
-        fetchBranchesList(),
+        fetchMembersList(memberParams),
+        fetchBranchesList(branchParams),
       ]);
       if (mRes.data && mRes.data.success) {
         setMembers(mRes.data.data);
@@ -46,7 +79,7 @@ const MemberListPage = () => {
 
   useEffect(() => {
     loadMembers();
-  }, [statusFilter, branchFilter, categoryFilter]);
+  }, [statusFilter, branchFilter, categoryFilter, selectedOrgId]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -123,6 +156,28 @@ const MemberListPage = () => {
         </form>
 
         <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
+          {/* Super Admin Organization Filter */}
+          {isSuperAdmin && (
+            <div className="flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <select
+                value={selectedOrgId}
+                onChange={(e) => {
+                  setSelectedOrgId(e.target.value);
+                  setBranchFilter('All');
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-bold focus:outline-none"
+              >
+                <option value="All">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <Filter className="w-4 h-4 text-slate-500" />
 
           <select

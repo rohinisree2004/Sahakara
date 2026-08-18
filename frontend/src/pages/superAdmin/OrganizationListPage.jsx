@@ -10,9 +10,12 @@ import {
   Power, 
   Trash2, 
   Loader2, 
-  AlertCircle 
+  AlertCircle,
+  PlusCircle,
+  X,
+  Send
 } from 'lucide-react';
-import { fetchOrganizations, updateOrgStatus } from '../../services/api';
+import { fetchOrganizations, updateOrgStatus, createOrganizationApi } from '../../services/api';
 
 const OrganizationListPage = () => {
   const [organizations, setOrganizations] = useState([]);
@@ -21,6 +24,25 @@ const OrganizationListPage = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [actionMsg, setActionMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Create Organization Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    code: '',
+    registrationNumber: '',
+    societyType: 'Credit Cooperative',
+    email: '',
+    phone: '',
+    address: '',
+    state: 'Karnataka',
+    city: '',
+    pincode: '',
+    adminName: '',
+    adminPassword: 'password123',
+  });
 
   const loadOrgs = async () => {
     setLoading(true);
@@ -75,6 +97,40 @@ const OrganizationListPage = () => {
     }
   };
 
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setErrorMsg('');
+    setActionMsg('');
+
+    try {
+      const res = await createOrganizationApi(createForm);
+      if (res.data && res.data.success) {
+        setActionMsg(res.data.message || `Organization '${createForm.name}' created successfully!`);
+        setShowCreateModal(false);
+        setCreateForm({
+          name: '',
+          code: '',
+          registrationNumber: '',
+          societyType: 'Credit Cooperative',
+          email: '',
+          phone: '',
+          address: '',
+          state: 'Karnataka',
+          city: '',
+          pincode: '',
+          adminName: '',
+          adminPassword: 'password123',
+        });
+        loadOrgs();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create organization.');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -86,15 +142,33 @@ const OrganizationListPage = () => {
             <span>Cooperative Organizations Registry</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Manage all registered tenant societies, search records, suspend or reactivate platform access
+            Manage all registered tenant societies, search records, suspend or reactivate platform access, and manage branches & staff
           </p>
         </div>
+
+        <button
+          onClick={() => {
+            setShowCreateModal(true);
+            setErrorMsg('');
+          }}
+          className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>Onboard New Society</span>
+        </button>
       </div>
 
       {actionMsg && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <span>{actionMsg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          <span>{errorMsg}</span>
         </div>
       )}
 
@@ -137,6 +211,7 @@ const OrganizationListPage = () => {
               <option value="Credit Cooperative">Credit Co-op</option>
               <option value="Agricultural Cooperative">Agricultural Co-op</option>
               <option value="Housing Cooperative">Housing Co-op</option>
+              <option value="Multi-Purpose Cooperative">Multi-Purpose</option>
             </select>
           </div>
         </div>
@@ -191,10 +266,10 @@ const OrganizationListPage = () => {
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           to={`/super-admin/organizations/${org._id}`}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5"
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold flex items-center gap-1.5 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Details</span>
+                          <span>Manage Org</span>
                         </Link>
 
                         <button
@@ -221,6 +296,209 @@ const OrganizationListPage = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Onboard Organization Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl glass-card rounded-3xl border border-slate-700/80 shadow-2xl p-6 sm:p-8 my-8 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowCreateModal(false)}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800/60 hover:bg-slate-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center text-white shadow-lg">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Direct Society Onboarding</h3>
+                <p className="text-xs text-slate-400">Provision a new tenant cooperative society and Admin account</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Society Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                    placeholder="e.g. Navodaya Rural Credit Society Ltd."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Society Code (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.code}
+                    onChange={(e) => setCreateForm({ ...createForm, code: e.target.value })}
+                    placeholder="Auto-generated if blank (e.g. NRC-101)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono uppercase"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Official Email <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                    placeholder="admin@navodaya.org"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Contact Phone <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={createForm.phone}
+                    onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Society Type
+                  </label>
+                  <select
+                    value={createForm.societyType}
+                    onChange={(e) => setCreateForm({ ...createForm, societyType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="Credit Cooperative">Credit Cooperative</option>
+                    <option value="Agricultural Cooperative">Agricultural Cooperative</option>
+                    <option value="Housing Cooperative">Housing Cooperative</option>
+                    <option value="Multi-Purpose Cooperative">Multi-Purpose Cooperative</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Reg. Number
+                  </label>
+                  <input
+                    type="text"
+                    value={createForm.registrationNumber}
+                    onChange={(e) => setCreateForm({ ...createForm, registrationNumber: e.target.value })}
+                    placeholder="e.g. REG/CS/2026/102"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    State <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={createForm.state}
+                    onChange={(e) => setCreateForm({ ...createForm, state: e.target.value })}
+                    placeholder="State"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={createForm.city}
+                    onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })}
+                    placeholder="City"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Pincode</label>
+                  <input
+                    type="text"
+                    value={createForm.pincode}
+                    onChange={(e) => setCreateForm({ ...createForm, pincode: e.target.value })}
+                    placeholder="560001"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800">
+                <h4 className="text-xs font-bold text-emerald-400 mb-2 uppercase tracking-wider">Initial Organization Admin User</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Admin Full Name</label>
+                    <input
+                      type="text"
+                      value={createForm.adminName}
+                      onChange={(e) => setCreateForm({ ...createForm, adminName: e.target.value })}
+                      placeholder="e.g. Ramesh Kumar"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Initial Password</label>
+                    <input
+                      type="text"
+                      value={createForm.adminPassword}
+                      onChange={(e) => setCreateForm({ ...createForm, adminPassword: e.target.value })}
+                      placeholder="password123"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-semibold text-slate-300 hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createLoading}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {createLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Onboard Organization</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

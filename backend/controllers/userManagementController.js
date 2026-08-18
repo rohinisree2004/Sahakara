@@ -6,10 +6,10 @@ const bcrypt = require('bcryptjs');
 
 // Helper to resolve orgId from request context
 const getOrgId = (req) => {
-  if (req.user.role === 'Super Admin' && req.query.organizationId) {
-    return req.query.organizationId;
+  if (req.user.role === 'Super Admin') {
+    return req.query.organizationId || req.body.organizationId || null;
   }
-  return req.user.organizationId || '65e111111111111111111111';
+  return req.user.organizationId || null;
 };
 
 // Helper to log user audit events
@@ -34,27 +34,22 @@ exports.getUserDashboard = async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
 
-    let totalUsers = 0;
-    let activeUsers = 0;
-    let inactiveUsers = 0;
-    let roleCounts = {};
+    const baseQuery = { isDeleted: false };
+    if (orgId) baseQuery.organizationId = orgId;
 
-    try {
-      totalUsers = await User.countDocuments({ organizationId: orgId, isDeleted: false });
-      activeUsers = await User.countDocuments({ organizationId: orgId, isActive: true, isDeleted: false });
-      inactiveUsers = await User.countDocuments({ organizationId: orgId, isActive: false, isDeleted: false });
-    } catch (e) {}
+    const totalUsers = await User.countDocuments(baseQuery);
+    const activeUsers = await User.countDocuments({ ...baseQuery, isActive: true });
+    const inactiveUsers = await User.countDocuments({ ...baseQuery, isActive: false });
 
-    let recentUsers = [];
-    try {
-      recentUsers = await User.find({ organizationId: orgId, isDeleted: false })
-        .select('-password')
-        .sort({ createdAt: -1 })
-        .limit(5);
-    } catch (e) {}
+    const recentUsers = await User.find(baseQuery)
+      .select('-password')
+      .populate('organizationId', 'name code')
+      .populate('branchId', 'branchName branchCode')
+      .sort({ createdAt: -1 })
+      .limit(5);
 
     const roleAggr = await User.aggregate([
-      { $match: { organizationId: orgId, isDeleted: false } },
+      { $match: baseQuery },
       { $group: { _id: "$role", count: { $sum: 1 } } }
     ]);
 
@@ -66,7 +61,7 @@ exports.getUserDashboard = async (req, res, next) => {
     };
 
     roleAggr.forEach(r => {
-      if (r._id === 'Organization Admin') roleDistribution.adminCount += r.count;
+      if (r._id === 'Organization Admin' || r._id === 'Super Admin') roleDistribution.adminCount += r.count;
       else if (['President', 'Secretary', 'Treasurer'].includes(r._id)) roleDistribution.executiveCount += r.count;
       else if (['Branch Manager', 'Employee'].includes(r._id)) roleDistribution.employeeCount += r.count;
       else if (r._id === 'Member') roleDistribution.memberCount += r.count;
@@ -97,7 +92,8 @@ exports.getUsersList = async (req, res, next) => {
     const orgId = getOrgId(req);
     const { search, role, branchId, status } = req.query;
 
-    let query = { organizationId: orgId, isDeleted: false };
+    let query = { isDeleted: false };
+    if (orgId) query.organizationId = orgId;
     if (role && role !== 'All') query.role = role;
     if (branchId && branchId !== 'All') query.branchId = branchId;
     if (status && status !== 'All') query.isActive = status === 'Active';
@@ -111,7 +107,11 @@ exports.getUsersList = async (req, res, next) => {
       ];
     }
 
-    const users = await User.find(query).select('-password').populate('branchId', 'branchName branchCode').sort({ createdAt: -1 });
+    const users = await User.find(query)
+      .select('-password')
+      .populate('branchId', 'branchName branchCode')
+      .populate('organizationId', 'name code')
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -128,8 +128,19 @@ exports.getUsersList = async (req, res, next) => {
 // @access  Private (Org Admin, Super Admin)
 exports.createUser = async (req, res, next) => {
   try {
-    const orgId = getOrgId(req);
-    const { name, email, username, password, role, branchId, phone, gender, address } = req.body;
+    let orgId = getOrgId(req);
+    const { name, email, username, password, role, branchId, phone, gender, address, organizationId } = req.body;
+
+    if (req.user.role === 'Super Admin' && organizationId) {
+      orgId = organizationId;
+    }
+
+    if (!orgId && role !== 'Super Admin') {
+      return res.status(400).json({
+        success: false,
+        error: 'Organization is required for user account creation.',
+      });
+    }
 
     if (!name || !email || !username || !password || !role) {
       return res.status(400).json({
@@ -142,45 +153,30 @@ exports.createUser = async (req, res, next) => {
     const cleanUsername = username.toLowerCase().trim();
 
     // Check unique email and username
-    try {
-      const existingUser = await User.findOne({
-        $or: [{ email: cleanEmail }, { username: cleanUsername }],
+    const existingUser = await User.findOne({
+      $or: [{ email: cleanEmail }, { username: cleanUsername }],
+    });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email or username already exists in the system.',
       });
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          error: 'User with this email or username already exists in the system.',
-        });
-      }
-    } catch (e) {}
-
-    let user = null;
-    try {
-      user = await User.create({
-        name,
-        email: cleanEmail,
-        username: cleanUsername,
-        password,
-        role,
-        organizationId: orgId,
-        branchId: branchId || null,
-        phone: phone || '',
-        gender: gender || 'Male',
-        address: address || '',
-        createdBy: req.user._id,
-        isActive: true,
-      });
-    } catch (dbErr) {
-      user = {
-        _id: 'USR-' + Date.now(),
-        name,
-        email: cleanEmail,
-        username: cleanUsername,
-        role,
-        organizationId: orgId,
-        isActive: true,
-      };
     }
+
+    const user = await User.create({
+      name,
+      email: cleanEmail,
+      username: cleanUsername,
+      password,
+      role,
+      organizationId: orgId,
+      branchId: branchId || null,
+      phone: phone || '',
+      gender: gender || 'Male',
+      address: address || '',
+      createdBy: req.user._id,
+      isActive: true,
+    });
 
     await logUserAudit(req, 'USER_CREATED', `Created new user account '${name}' (${role})`, orgId);
 
@@ -385,12 +381,63 @@ exports.softDeleteUser = async (req, res, next) => {
 exports.getUserReports = async (req, res, next) => {
   try {
     const { reportType } = req.query;
+    const orgId = getOrgId(req);
+
+    const userFilter = { isDeleted: false };
+    if (orgId) userFilter.organizationId = orgId;
+
+    const users = await User.find(userFilter)
+      .select('name role status isActive branchId')
+      .populate('branchId', 'branchName branchCode')
+      .limit(50);
+
+    const activeUsers = users.map((u) => ({
+      userId: u._id,
+      name: u.name,
+      role: u.role,
+      branch: u.branchId ? u.branchId.branchName : 'Head Office',
+      status: u.isActive ? 'Active' : 'Inactive',
+    }));
+
+    const branchWiseAgg = await User.aggregate([
+      { $match: userFilter },
+      {
+        $group: {
+          _id: "$branchId",
+          staffCount: {
+            $sum: {
+              $cond: [{ $in: ["$role", ["Employee", "Branch Manager", "Treasurer", "Secretary", "President"]] }, 1, 0]
+            }
+          },
+          memberCount: {
+            $sum: {
+              $cond: [{ $eq: ["$role", "Member"] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    const populatedBranchWise = await Promise.all(
+      branchWiseAgg.map(async (item) => {
+        let bName = 'Head Office / Unassigned';
+        if (item._id) {
+          const br = await Branch.findById(item._id);
+          if (br) bName = `${br.branchName} (${br.branchCode})`;
+        }
+        return {
+          branchName: bName,
+          staffCount: item.staffCount,
+          memberCount: item.memberCount,
+        };
+      })
+    );
 
     const reports = {
       type: reportType || 'ActiveUsers',
       generatedAt: new Date(),
-      activeUsers: [],
-      branchWiseUsers: [],
+      activeUsers,
+      branchWiseUsers: populatedBranchWise,
     };
 
     return res.status(200).json({

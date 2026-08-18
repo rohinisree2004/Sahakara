@@ -14,15 +14,15 @@ const MainLayout = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* DESKTOP SIDEBAR */}
-      <aside className="hidden md:flex md:w-64 border-r border-slate-800/80 sticky top-0 h-screen z-30 shrink-0">
+      <aside className="hidden md:flex md:w-64 border-r border-slate-800/80 sticky top-0 h-screen z-30 shrink-0 bg-slate-900/95 overflow-hidden">
         <Sidebar />
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-slate-950">
         
         {/* TOP HEADER */}
-        <header className="glass-nav sticky top-0 z-20 px-6 py-4 border-b border-slate-800/80 flex items-center justify-between gap-4">
+        <header className="glass-nav sticky top-0 z-20 px-6 py-4 border-b border-slate-800/80 flex items-center justify-between gap-4 bg-slate-950/90 backdrop-blur-md">
           
           <div className="flex items-center gap-3">
             <button
@@ -63,13 +63,13 @@ const MainLayout = () => {
 
         {/* MOBILE DRAWER */}
         {mobileSidebarOpen && (
-          <div className="md:hidden glass-card border-b border-slate-800 p-4">
+          <div className="md:hidden glass-card border-b border-slate-800 p-0 max-h-[85vh] overflow-y-auto">
             <Sidebar onCloseMobile={() => setMobileSidebarOpen(false)} />
           </div>
         )}
 
         {/* PAGE BODY */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-slate-950 min-h-[calc(100vh-73px)]">
           <Outlet />
         </main>
 

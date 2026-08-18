@@ -4,11 +4,19 @@ import {
   CheckCircle2, 
   Loader2, 
   Globe, 
-  User 
+  User,
+  Building2
 } from 'lucide-react';
-import { fetchUsersList, fetchBranchesList, transferUserBranchApi } from '../../services/api';
+import { fetchUsersList, fetchBranchesList, transferUserBranchApi, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const UserBranchTransferPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -17,19 +25,45 @@ const UserBranchTransferPage = () => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     const initData = async () => {
+      setLoading(true);
       try {
-        const [uRes, bRes] = await Promise.all([fetchUsersList(), fetchBranchesList()]);
+        const queryParams = {};
+        if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+          queryParams.organizationId = selectedOrgId;
+        }
+
+        const [uRes, bRes] = await Promise.all([
+          fetchUsersList(queryParams),
+          fetchBranchesList(queryParams)
+        ]);
         if (uRes.data && uRes.data.success) {
           const list = uRes.data.data;
           setUsers(list);
-          if (list.length > 0) setSelectedUserId(list[0]._id);
+          setSelectedUserId(list.length > 0 ? list[0]._id : '');
         }
         if (bRes.data && bRes.data.success) {
           const bList = bRes.data.data;
           setBranches(bList);
-          if (bList.length > 0) setSelectedBranchId(bList[0]._id);
+          setSelectedBranchId(bList.length > 0 ? bList[0]._id : '');
         }
       } catch (err) {
         console.warn('Error loading transfer desk data:', err.message);
@@ -38,7 +72,7 @@ const UserBranchTransferPage = () => {
       }
     };
     initData();
-  }, []);
+  }, [selectedOrgId]);
 
   const selectedUser = users.find((u) => u._id === selectedUserId) || users[0];
   const targetBranch = branches.find((b) => b._id === selectedBranchId) || branches[0];
@@ -99,6 +133,29 @@ const UserBranchTransferPage = () => {
       {/* Transfer Form */}
       <form onSubmit={handleTransferSubmit} className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
         
+        {/* Super Admin Organization Picker */}
+        {isSuperAdmin && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Select Organization Scope</label>
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none"
+              >
+                <option value="All">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">Filtering staff and target branches for the selected cooperative society.</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Select Employee / Staff *</label>

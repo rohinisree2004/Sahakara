@@ -142,7 +142,7 @@ import MemberDashboard from './pages/dashboards/MemberDashboard';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Landing & Authentication */}
           <Route path="/" element={<LandingPage />} />

@@ -6,7 +6,9 @@ const {
   approveOrganization,
   rejectOrganization,
   getAllOrganizations,
+  createOrganization,
   getOrganizationDetails,
+  updateOrganization,
   updateOrganizationStatus,
   getSystemSettings,
   updateSystemSettings,
@@ -24,7 +26,9 @@ router.get('/approvals', getPendingApprovals);
 router.post('/approvals/:id/approve', approveOrganization);
 router.post('/approvals/:id/reject', rejectOrganization);
 router.get('/organizations', getAllOrganizations);
+router.post('/organizations', createOrganization);
 router.get('/organizations/:id', getOrganizationDetails);
+router.put('/organizations/:id', updateOrganization);
 router.put('/organizations/:id/status', updateOrganizationStatus);
 router.get('/settings', getSystemSettings);
 router.put('/settings', updateSystemSettings);

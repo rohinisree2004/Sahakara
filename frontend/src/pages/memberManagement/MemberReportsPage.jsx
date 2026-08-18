@@ -4,21 +4,50 @@ import {
   Download, 
   Printer, 
   CheckCircle2, 
-  Loader2 
+  Loader2,
+  Building2 
 } from 'lucide-react';
-import { fetchMemberReports } from '../../services/api';
+import { fetchMemberReports, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MemberReportsPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [reportType, setReportType] = useState('ActiveMembers');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exportMsg, setExportMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     const loadReport = async () => {
       setLoading(true);
       try {
-        const res = await fetchMemberReports({ reportType });
+        const params = { reportType };
+        if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+          params.organizationId = selectedOrgId;
+        }
+        const res = await fetchMemberReports(params);
         if (res.data && res.data.success) {
           setData(res.data.data);
         }
@@ -29,7 +58,7 @@ const MemberReportsPage = () => {
       }
     };
     loadReport();
-  }, [reportType]);
+  }, [reportType, selectedOrgId]);
 
   const handleExportPDF = () => {
     setExportMsg(`Exporting ${reportType} Report as PDF... Saved to downloads.`);
@@ -41,16 +70,8 @@ const MemberReportsPage = () => {
     setTimeout(() => setExportMsg(''), 4000);
   };
 
-  const activeMembersList = data?.activeMembers || [
-    { memberId: 'MEM-2026-101', name: 'Ganesh Bhatt', category: 'Regular Member', branch: 'JP Nagar Main Branch', status: 'Active' },
-    { memberId: 'MEM-2026-102', name: 'Rajesh Sharma', category: 'Regular Member', branch: 'Malleshwaram Extension', status: 'Active' },
-  ];
-
-  const branchGrowthList = data?.branchGrowth || [
-    { branchName: 'JP Nagar Main Branch', memberCount: 850, activeSavings: '₹ 4.8 Cr' },
-    { branchName: 'Malleshwaram Extension', memberCount: 620, activeSavings: '₹ 3.2 Cr' },
-    { branchName: 'Whitefield Tech Hub', memberCount: 980, activeSavings: '₹ 6.5 Cr' },
-  ];
+  const activeMembersList = data?.activeMembers || [];
+  const branchGrowthList = data?.branchGrowth || [];
 
   return (
     <div className="space-y-6">
@@ -67,7 +88,26 @@ const MemberReportsPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-slate-400 font-semibold">Society:</span>
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="bg-transparent text-emerald-300 font-bold focus:outline-none cursor-pointer"
+              >
+                <option value="All" className="bg-slate-900 text-white">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id} className="bg-slate-900 text-white">
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             onClick={handleExportPDF}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700"

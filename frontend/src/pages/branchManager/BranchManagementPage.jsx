@@ -11,11 +11,19 @@ import {
   Eye, 
   CheckCircle2, 
   AlertCircle, 
-  Loader2 
+  Loader2,
+  Building2
 } from 'lucide-react';
-import { fetchBranchesList, createBranchApi, updateBranchApi, deleteBranchApi } from '../../services/api';
+import { fetchBranchesList, createBranchApi, updateBranchApi, deleteBranchApi, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const BranchManagementPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -24,6 +32,7 @@ const BranchManagementPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
   const [formData, setFormData] = useState({
+    organizationId: '',
     branchName: '',
     branchCode: '',
     district: '',
@@ -37,10 +46,31 @@ const BranchManagementPage = () => {
   const [msg, setMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   const loadBranches = async () => {
     setLoading(true);
     try {
-      const res = await fetchBranchesList({ search, status: statusFilter });
+      const params = { search, status: statusFilter };
+      if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+        params.organizationId = selectedOrgId;
+      }
+      const res = await fetchBranchesList(params);
       if (res.data && res.data.success) {
         setBranches(res.data.data);
       }
@@ -53,7 +83,7 @@ const BranchManagementPage = () => {
 
   useEffect(() => {
     loadBranches();
-  }, [statusFilter]);
+  }, [statusFilter, selectedOrgId]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -63,6 +93,7 @@ const BranchManagementPage = () => {
   const handleOpenAddModal = () => {
     setEditingBranch(null);
     setFormData({
+      organizationId: isSuperAdmin && selectedOrgId !== 'All' ? selectedOrgId : (organizations[0]?._id || ''),
       branchName: '',
       branchCode: '',
       district: '',
@@ -78,6 +109,7 @@ const BranchManagementPage = () => {
   const handleOpenEditModal = (branch) => {
     setEditingBranch(branch);
     setFormData({
+      organizationId: branch.organizationId?._id || branch.organizationId || '',
       branchName: branch.branchName || '',
       branchCode: branch.branchCode || '',
       district: branch.district || '',
@@ -154,17 +186,36 @@ const BranchManagementPage = () => {
             <span>Branch Management & Registry</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Maintain unique branch codes per organization, manage branch addresses, districts, and status
+            {isSuperAdmin 
+              ? 'Multi-tenant control: Filter and manage branches by cooperative society'
+              : 'Maintain unique branch codes per organization, manage branch addresses, districts, and status'}
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Add New Branch</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/branches/dashboard"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-400 border border-teal-500/30 text-xs font-bold transition-all flex items-center gap-2 shadow-lg"
+          >
+            <Globe className="w-4 h-4" />
+            <span>Branch Dashboard</span>
+          </Link>
+
+          <Link
+            to="/branches/manager-assign"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition-all flex items-center gap-2 shadow-lg"
+          >
+            <span>Assign Managers</span>
+          </Link>
+
+          <button
+            onClick={handleOpenAddModal}
+            className="px-4 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Add New Branch</span>
+          </button>
+        </div>
       </div>
 
       {msg && (
@@ -187,18 +238,40 @@ const BranchManagementPage = () => {
           />
         </form>
 
-        <div className="flex items-center gap-3 text-xs">
-          <Filter className="w-4 h-4 text-slate-500" />
-          <span className="text-slate-400 font-semibold">Filter Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
+          {/* Super Admin Organization Selector */}
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-slate-400 font-semibold hidden sm:inline">Society:</span>
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-bold focus:outline-none"
+              >
+                <option value="All">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <span className="text-slate-400 font-semibold">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -230,8 +303,17 @@ const BranchManagementPage = () => {
                           <Globe className="w-4 h-4" />
                         </div>
                         <div>
-                          <div>{b.branchName}</div>
-                          <div className="text-[11px] text-slate-500 font-normal">{b.phone || b.email}</div>
+                          <div className="flex items-center gap-2">
+                            <span>{b.branchName}</span>
+                            {b.organizationId?.code && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[9px]">
+                                {b.organizationId.code}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-normal">
+                            {b.organizationId?.name ? `${b.organizationId.name} • ` : ''}{b.phone || b.email}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -311,6 +393,26 @@ const BranchManagementPage = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Organization Picker in Modal (For Super Admin) */}
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Target Organization *</label>
+                  <select
+                    value={formData.organizationId}
+                    onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
+                    required
+                    disabled={!!editingBranch}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none disabled:opacity-50"
+                  >
+                    {organizations.map((org) => (
+                      <option key={org._id} value={org._id}>
+                        {org.name} ({org.code || 'ORG'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Name *</label>

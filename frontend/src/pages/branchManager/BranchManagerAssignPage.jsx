@@ -6,11 +6,19 @@ import {
   Loader2, 
   User, 
   ShieldCheck, 
-  ArrowRight 
+  ArrowRight,
+  Building2 
 } from 'lucide-react';
-import { fetchBranchesList, assignBranchManagerApi, fetchOrgEmployees } from '../../services/api';
+import { fetchBranchesList, assignBranchManagerApi, fetchOrgEmployees, fetchOrganizations } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const BranchManagerAssignPage = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'Super Admin';
+
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrgId, setSelectedOrgId] = useState('All');
+
   const [branches, setBranches] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -19,16 +27,45 @@ const BranchManagerAssignPage = () => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
+  // Load organizations for Super Admin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const loadOrgs = async () => {
+        try {
+          const res = await fetchOrganizations({ limit: 100 });
+          if (res.data && res.data.success) {
+            setOrganizations(res.data.data);
+          }
+        } catch (err) {
+          console.warn('Error loading organizations:', err.message);
+        }
+      };
+      loadOrgs();
+    }
+  }, [isSuperAdmin]);
+
   useEffect(() => {
     const initData = async () => {
+      setLoading(true);
       try {
-        const [bRes, eRes] = await Promise.all([fetchBranchesList(), fetchOrgEmployees()]);
+        const queryParams = {};
+        if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
+          queryParams.organizationId = selectedOrgId;
+        }
+
+        const [bRes, eRes] = await Promise.all([
+          fetchBranchesList(queryParams),
+          fetchOrgEmployees(queryParams)
+        ]);
         if (bRes.data && bRes.data.success) {
           const list = bRes.data.data;
           setBranches(list);
           if (list.length > 0) {
             setSelectedBranchId(list[0]._id);
             setSelectedManagerName(list[0].managerName || '');
+          } else {
+            setSelectedBranchId('');
+            setSelectedManagerName('');
           }
         }
         if (eRes.data && eRes.data.success) {
@@ -41,7 +78,7 @@ const BranchManagerAssignPage = () => {
       }
     };
     initData();
-  }, []);
+  }, [selectedOrgId]);
 
   const handleBranchChange = (e) => {
     const bId = e.target.value;
@@ -109,6 +146,29 @@ const BranchManagerAssignPage = () => {
       {/* Assignment Card */}
       <form onSubmit={handleAssignSubmit} className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
         
+        {/* Super Admin Organization Picker */}
+        {isSuperAdmin && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Select Organization Scope</label>
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none"
+              >
+                <option value="All">All Organizations</option>
+                {organizations.map((org) => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} ({org.code || 'ORG'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">Filtering branches and staff for the selected cooperative society.</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Select Operational Branch *</label>

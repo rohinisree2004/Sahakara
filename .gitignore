@@ -46,3 +46,13 @@ backend/uploads/*
 full_prompt.txt
 prompt.json
 
+# Documentation, Reports, Presentations & TeX files
+PRESENTATION_*.md
+*.zip
+Report/
+Report.zip
+*.tex
+*.pdf
+*.docx
+
+
