@@ -1,213 +1,259 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchSavingsAccounts } from '../../services/api';
-import { Search, Filter, Eye, Plus, Wallet, AlertCircle } from 'lucide-react';
+import { 
+  Search, 
+  Filter, 
+  Eye, 
+  Plus, 
+  Wallet, 
+  AlertCircle,
+  BookOpen,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Building2,
+  GitBranch,
+  Users
+} from 'lucide-react';
+import HierarchicalFilterBar from '../../components/common/HierarchicalFilterBar';
 
 const SavingsAccountsPage = () => {
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [filterParams, setFilterParams] = useState({});
   
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async (customFilterParams = filterParams) => {
     setIsLoading(true);
     try {
-      const params = { page, limit: 10 };
-      if (statusFilter) params.status = statusFilter;
-      // Depending on the backend we might want a search param, but for now we filter locally if backend doesn't support it, 
-      // or we can pass memberId if we know it. Assuming backend returns paginated results.
+      const params = { page, limit: 15 };
+      if (statusFilter && statusFilter !== 'All') params.status = statusFilter;
+      if (customFilterParams.organizationId && customFilterParams.organizationId !== 'All') params.organizationId = customFilterParams.organizationId;
+      if (customFilterParams.branchId && customFilterParams.branchId !== 'All') params.branchId = customFilterParams.branchId;
+      if (customFilterParams.groupId && customFilterParams.groupId !== 'All') params.groupId = customFilterParams.groupId;
+      if (customFilterParams.memberId && customFilterParams.memberId !== 'All') params.memberId = customFilterParams.memberId;
+      if (searchTerm) params.search = searchTerm;
+
       const response = await fetchSavingsAccounts(params);
-      if (response.data.success) {
-        setAccounts(response.data.data);
-        setTotalPages(response.data.totalPages);
+      if (response.data && response.data.success) {
+        setAccounts(response.data.data || []);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalRecords(response.data.total || 0);
       }
     } catch (error) {
       console.error('Failed to load accounts', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, statusFilter, searchTerm, filterParams]);
 
   useEffect(() => {
-    loadAccounts();
-  }, [page, statusFilter]);
+    loadAccounts(filterParams);
+  }, [loadAccounts, page, statusFilter, filterParams]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount || 0);
+  const handleFilterChange = (newFilters) => {
+    setFilterParams(newFilters);
+    setPage(1);
   };
 
-  // Local filtering for search (if backend search not implemented by text)
-  const filteredAccounts = accounts.filter(acc => {
-    if (!searchTerm) return true;
-    const lowerSearch = searchTerm.toLowerCase();
-    return (
-      acc.accountNumber.toLowerCase().includes(lowerSearch) ||
-      (acc.memberId && acc.memberId.fullName && acc.memberId.fullName.toLowerCase().includes(lowerSearch)) ||
-      (acc.memberId && acc.memberId.memberId && acc.memberId.memberId.toLowerCase().includes(lowerSearch))
-    );
-  });
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
+      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Wallet className="w-8 h-8 text-emerald-400" />
-            Savings Accounts
-          </h1>
-          <p className="text-slate-400 mt-1">Manage and view all member savings accounts.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="space-y-1">
+          <Link 
+            to="/savings/dashboard" 
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-800 hover:text-teal-950 mb-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Savings Dashboard</span>
+          </Link>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-800 font-bold">
+              <Wallet className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Member Savings Accounts
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Manage member savings folios, passbook issuances, and account statuses
+              </p>
+            </div>
+          </div>
         </div>
+
         <Link 
           to="/savings/accounts/create"
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-emerald-600/20 whitespace-nowrap"
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/20"
         >
-          <Plus className="w-5 h-5" />
-          Create Account
+          <Plus className="w-4 h-4" />
+          <span>Open Savings Account</span>
         </Link>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      {/* Governance & Cascading Filter Desk */}
+      <HierarchicalFilterBar onFilterChange={handleFilterChange} />
+
+      {/* Search & Status Filters Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="w-full md:w-96 relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input 
             type="text" 
             placeholder="Search by Account Number or Member Name..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
           />
         </div>
-        <div className="w-full md:w-64 relative">
-          <Filter className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <select 
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Dormant">Dormant</option>
-            <option value="Closed">Closed</option>
-            <option value="Frozen">Frozen</option>
-          </select>
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+            <Filter className="w-4 h-4 text-teal-600 shrink-0" />
+            <select 
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Account Statuses</option>
+              <option value="Active">Active Accounts</option>
+              <option value="Dormant">Dormant Accounts</option>
+              <option value="Frozen">Frozen Accounts</option>
+              <option value="Closed">Closed Accounts</option>
+            </select>
+          </div>
+
+          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-2 rounded-xl border border-teal-200 whitespace-nowrap">
+            {totalRecords} Total Accounts
+          </span>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-700/50 uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th className="px-6 py-4">Account No.</th>
-                <th className="px-6 py-4">Member Info</th>
-                <th className="px-6 py-4">Account Type</th>
-                <th className="px-6 py-4">Balance</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {isLoading ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                    <p className="text-slate-400 mt-2">Loading accounts...</p>
-                  </td>
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center p-16 text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="p-16 text-center text-slate-400 space-y-2">
+            <Wallet className="w-10 h-10 mx-auto text-slate-300" />
+            <p className="text-sm font-bold text-slate-700">No savings accounts found matching current scope.</p>
+            <p className="text-xs text-slate-500">Adjust the filter parameters above.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider">
+                  <th className="py-4 px-6">Account Number</th>
+                  <th className="py-4 px-6">Member Info</th>
+                  <th className="py-4 px-6">Account Scheme</th>
+                  <th className="py-4 px-6">Society & Branch</th>
+                  <th className="py-4 px-6 text-right">Current Balance</th>
+                  <th className="py-4 px-6 text-center">Status</th>
+                  <th className="py-4 px-6 text-right">Passbook</th>
                 </tr>
-              ) : filteredAccounts.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-slate-500">
-                      <AlertCircle className="w-12 h-12 mb-3 text-slate-600" />
-                      <p className="text-base font-medium text-slate-400">No savings accounts found</p>
-                      <p className="text-xs">Adjust your search or filters.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredAccounts.map((account) => (
-                  <tr key={account._id} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="px-6 py-4 font-mono text-emerald-400 font-medium">
-                      {account.accountNumber}
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {accounts.map((acc) => (
+                  <tr key={acc._id} className="hover:bg-teal-50/20 transition-colors">
+                    <td className="py-4 px-6 font-mono font-bold text-teal-800">
+                      {acc.accountNumber}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {account.memberId?.profileImage ? (
-                          <img src={account.memberId.profileImage} alt={account.memberId.fullName} className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs">
-                            {account.memberId?.fullName?.charAt(0) || 'M'}
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-semibold text-white">{account.memberId?.fullName || 'Unknown'}</div>
-                          <div className="text-xs text-slate-400 font-mono">{account.memberId?.memberId || 'N/A'}</div>
-                        </div>
+
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-slate-900">{acc.memberId?.fullName || 'N/A'}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        ID: {acc.memberId?.memberId || 'N/A'} {acc.memberId?.phone ? `• ${acc.memberId.phone}` : ''}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-300">
-                      {account.accountType}
+
+                    <td className="py-4 px-6">
+                      <span className="font-bold text-slate-800">{acc.accountType || 'Regular Savings'}</span>
+                      {acc.interestRate ? (
+                        <div className="text-[10px] text-teal-800 font-semibold">{acc.interestRate}% Interest p.a.</div>
+                      ) : null}
                     </td>
-                    <td className="px-6 py-4 font-bold text-white">
-                      {formatCurrency(account.currentBalance)}
+
+                    <td className="py-4 px-6">
+                      <div className="text-slate-900 font-bold">{acc.organizationId?.name || 'Cooperative Society'}</div>
+                      <div className="text-[10px] text-slate-500">{acc.branchId?.branchName || 'Main Branch'}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
-                        account.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        account.status === 'Closed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                        'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+
+                    <td className="py-4 px-6 text-right font-mono font-bold text-slate-900 text-sm">
+                      {formatCurrency(acc.currentBalance)}
+                    </td>
+
+                    <td className="py-4 px-6 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                        acc.status === 'Active'
+                          ? 'bg-teal-50 text-teal-800 border-teal-200'
+                          : acc.status === 'Dormant'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-rose-50 text-rose-800 border-rose-200'
                       }`}>
-                        {account.status}
+                        {acc.status || 'Active'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+
+                    <td className="py-4 px-6 text-right">
                       <Link
-                        to={`/savings/accounts/${account._id}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 transition-colors"
-                        title="View Profile"
+                        to={`/savings/passbook/${acc._id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-all"
                       >
-                        <Eye className="w-4 h-4" />
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Passbook</span>
                       </Link>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination Controls */}
-        {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700/50 bg-slate-900/30">
-            <span className="text-sm text-slate-400">
-              Page <span className="font-medium text-white">{page}</span> of <span className="font-medium text-white">{totalPages}</span>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination Toolbar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-medium">
+              Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalRecords} accounts)
             </span>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 transition-colors"
               >
-                Previous
+                <ChevronLeft className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 transition-colors"
               >
-                Next
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
+
       </div>
+
     </div>
   );
 };

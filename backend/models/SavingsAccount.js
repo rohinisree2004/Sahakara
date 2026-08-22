@@ -20,6 +20,11 @@ const SavingsAccountSchema = new mongoose.Schema(
       required: [true, 'Savings Account must belong to a member'],
       index: true,
     },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      index: true,
+    },
     accountNumber: {
       type: String,
       required: [true, 'Account number is required'],
@@ -86,6 +91,6 @@ const SavingsAccountSchema = new mongoose.Schema(
 );
 
 // Compound indexes for optimization and data isolation
-SavingsAccountSchema.index({ organizationId: 1, memberId: 1, accountType: 1 }, { unique: true }); // Prevent duplicate account types for same member
+SavingsAccountSchema.index({ organizationId: 1, memberId: 1, groupId: 1 });
 
 module.exports = mongoose.model('SavingsAccount', SavingsAccountSchema);

@@ -7,12 +7,15 @@ const {
   getSavingsAccountById,
   recordDeposit,
   getSavingsTransactions,
-  getPassbook
+  getPassbook,
+  submitDepositRequest,
+  submitWithdrawalRequest,
+  getPendingSavingsRequests,
+  approveSavingsRequest,
+  rejectSavingsRequest,
+  rollbackSavingsTransaction
 } = require('../controllers/savingsController');
 const { protect } = require('../middleware/authMiddleware');
-
-// Check Permissions Middleware placeholder - if project has a specific permission middleware, it can be applied here
-// Example: const { checkPermission } = require('../middleware/authMiddleware');
 
 // Apply auth middleware to all routes
 router.use(protect);
@@ -20,6 +23,22 @@ router.use(protect);
 // Dashboard
 router.route('/dashboard')
   .get(getSavingsDashboardStats);
+
+// Member Self-Service Requests & Approval Queues
+router.route('/deposit-request')
+  .post(submitDepositRequest);
+
+router.route('/withdrawal-request')
+  .post(submitWithdrawalRequest);
+
+router.route('/pending-requests')
+  .get(getPendingSavingsRequests);
+
+router.route('/requests/:id/approve')
+  .put(approveSavingsRequest);
+
+router.route('/requests/:id/reject')
+  .put(rejectSavingsRequest);
 
 // Accounts
 router.route('/accounts')
@@ -36,6 +55,9 @@ router.route('/deposit')
 // Transactions
 router.route('/transactions')
   .get(getSavingsTransactions);
+
+router.route('/transactions/:id/rollback')
+  .post(rollbackSavingsTransaction);
 
 // Passbook
 router.route('/passbook/:accountId')

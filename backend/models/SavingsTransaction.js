@@ -26,6 +26,11 @@ const SavingsTransactionSchema = new mongoose.Schema(
       required: [true, 'Transaction must belong to a member'],
       index: true,
     },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      index: true,
+    },
     transactionId: {
       type: String,
       required: [true, 'Transaction ID is required'],
@@ -44,7 +49,7 @@ const SavingsTransactionSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: [true, 'Payment method is required'],
-      enum: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Other'],
+      enum: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Savings Auto-Debit', 'Savings Account Auto-Debit', 'Other'],
       default: 'Cash',
     },
     referenceNumber: {
