@@ -1,211 +1,332 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchLoans } from '../../services/api';
-import { Search, Filter, Eye, AlertCircle, Banknote, Clock } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { 
+  Search, 
+  Filter, 
+  Eye, 
+  AlertCircle, 
+  Banknote, 
+  Clock,
+  ArrowLeft,
+  Plus,
+  Building2,
+  GitBranch,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Calendar,
+  Users,
+  ShieldCheck
+} from 'lucide-react';
+import HierarchicalFilterBar from '../../components/common/HierarchicalFilterBar';
 
 const LoanApplicationListPage = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const statusParam = queryParams.get('status') || '';
 
+  const { user, activeGroup } = useAuth();
+  const activeRole = activeGroup?.role || user?.role || 'Member';
+  const isPlatformStaff = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee'].includes(activeRole);
+  const isExecutive = ['President', 'Treasurer', 'Secretary'].includes(activeRole);
+
   const [loans, setLoans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(statusParam);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterParams, setFilterParams] = useState({});
 
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
-  const loadLoans = async () => {
+  const getBackRoute = () => {
+    if (activeRole === 'President') return '/executive/dashboard';
+    if (activeRole === 'Treasurer') return '/treasurer/dashboard';
+    if (activeRole === 'Secretary') return '/secretary/dashboard';
+    if (activeRole === 'Member') return '/member/dashboard';
+    return '/loans/dashboard';
+  };
+
+  const loadLoans = useCallback(async (customFilterParams = filterParams) => {
     setIsLoading(true);
     try {
       const params = { page, limit: 15 };
-      if (statusFilter) params.status = statusFilter;
+      if (statusFilter && statusFilter !== 'All') params.status = statusFilter;
+      
+      if (!isPlatformStaff && activeGroup?._id) {
+        params.groupId = activeGroup._id;
+      } else if (customFilterParams.groupId && customFilterParams.groupId !== 'All') {
+        params.groupId = customFilterParams.groupId;
+      }
+
+      if (activeRole === 'Member') {
+        params.myOnly = 'true';
+      }
+
+      if (customFilterParams.organizationId && customFilterParams.organizationId !== 'All') params.organizationId = customFilterParams.organizationId;
+      if (customFilterParams.branchId && customFilterParams.branchId !== 'All') params.branchId = customFilterParams.branchId;
+      if (customFilterParams.memberId && customFilterParams.memberId !== 'All') params.memberId = customFilterParams.memberId;
+      if (searchTerm) params.search = searchTerm;
 
       const response = await fetchLoans(params);
-      if (response.data.success) {
-        setLoans(response.data.data);
-        setTotalPages(response.data.totalPages);
-        setTotalRecords(response.data.total);
+      if (response.data && response.data.success) {
+        setLoans(response.data.data || []);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalRecords(response.data.total || 0);
       }
     } catch (error) {
       console.error('Failed to load loans', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, statusFilter, searchTerm, filterParams, isPlatformStaff, activeGroup, activeRole]);
 
   useEffect(() => {
-    loadLoans();
-  }, [page, statusFilter]);
+    loadLoans(filterParams);
+  }, [loadLoans, page, statusFilter, filterParams]);
+
+  const handleFilterChange = (newFilters) => {
+    setFilterParams(newFilters);
+    setPage(1);
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
   };
 
-  const getStatusColor = (status) => {
-    if (status === 'Active' || status === 'Disbursed') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    if (status === 'Approved' || status === 'Recommended') return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-    if (status === 'Rejected') return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-    if (status === 'Closed') return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    return 'bg-amber-500/10 text-amber-400 border-amber-500/20'; // Pending, Under Review
-  };
-
-  // Local filtering for search
-  const filteredLoans = loans.filter(loan => {
-    if (!searchTerm) return true;
-    const lowerSearch = searchTerm.toLowerCase();
-    return (
-      loan.applicationId.toLowerCase().includes(lowerSearch) ||
-      (loan.memberId && loan.memberId.fullName && loan.memberId.fullName.toLowerCase().includes(lowerSearch)) ||
-      (loan.memberId && loan.memberId.memberId && loan.memberId.memberId.toLowerCase().includes(lowerSearch))
-    );
-  });
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
+      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Clock className="w-8 h-8 text-emerald-400" />
-            Loan Applications
-          </h1>
-          <p className="text-slate-400 mt-1">Review and manage pending and past loan applications.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="space-y-1">
+          <Link 
+            to={getBackRoute()} 
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-800 hover:text-teal-950 mb-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Dashboard</span>
+          </Link>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-800 font-bold">
+              <Clock className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {isExecutive ? 'Group Loan Applications Registry' : 'Loan Applications Registry'}
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {isExecutive 
+                  ? `Review, verify, and endorse credit requests submitted by members of ${activeGroup?.groupName || 'your group'}`
+                  : 'Review, verify and process loan applications across society network'
+                }
+              </p>
+            </div>
+          </div>
         </div>
+
+        <Link 
+          to="/loans/apply"
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/20"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Application</span>
+        </Link>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 backdrop-blur-sm flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      {/* Governance & Cascading Filter Desk (Staff Only) */}
+      {isPlatformStaff ? (
+        <HierarchicalFilterBar onFilterChange={handleFilterChange} />
+      ) : activeGroup ? (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 font-bold">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <span>Active Group Folio:</span>
+                <span className="text-teal-900 font-extrabold">{activeGroup.groupName}</span>
+                <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                  {activeGroup.groupCode}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Displaying credit applications submitted by enrolled group members
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold font-mono flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>{activeRole} Scope</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Search & Status Filters Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="w-full md:w-96 relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input 
             type="text" 
             placeholder="Search by Application ID or Member Name..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
           />
         </div>
-        <div className="w-full md:w-64 relative">
-          <Filter className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <select 
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="Pending">Pending</option>
-            <option value="Under Review">Under Review</option>
-            <option value="Recommended">Recommended</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Disbursed">Disbursed</option>
-            <option value="Active">Active</option>
-            <option value="Closed">Closed</option>
-          </select>
-        </div>
-      </div>
 
-      {/* Results Info */}
-      <div className="text-sm text-slate-400">
-        Showing <span className="font-bold text-white">{filteredLoans.length}</span> of <span className="font-bold text-white">{totalRecords}</span> loans
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+            <Filter className="w-4 h-4 text-teal-600 shrink-0" />
+            <select 
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="">All Loan Statuses</option>
+              <option value="Pending">Pending Review</option>
+              <option value="Under Review">Under Review</option>
+              <option value="Recommended">Recommended</option>
+              <option value="Returned">Returned for Correction</option>
+              <option value="Approved">Approved</option>
+              <option value="Disbursed">Disbursed</option>
+              <option value="Active">Active</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+
+          <span className="text-xs font-bold text-teal-800 bg-teal-50 px-3 py-2 rounded-xl border border-teal-200 whitespace-nowrap">
+            {totalRecords} Total Loans
+          </span>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-900/50 text-slate-400 border-b border-slate-700/50 uppercase text-[10px] tracking-wider font-bold">
-              <tr>
-                <th className="px-6 py-4">App ID & Date</th>
-                <th className="px-6 py-4">Member Info</th>
-                <th className="px-6 py-4">Loan Type</th>
-                <th className="px-6 py-4">Requested Amt</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {isLoading ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                  </td>
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center p-16 text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          </div>
+        ) : loans.length === 0 ? (
+          <div className="p-16 text-center text-slate-400 space-y-2">
+            <Banknote className="w-10 h-10 mx-auto text-slate-300" />
+            <p className="text-sm font-bold text-slate-700">No loan applications found matching scope.</p>
+            <p className="text-xs text-slate-500">Adjust the filters above or submit a new loan application.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider">
+                  <th className="py-4 px-6">App ID & Date</th>
+                  <th className="py-4 px-6">Member Info</th>
+                  <th className="py-4 px-6">Loan Scheme</th>
+                  <th className="py-4 px-6">Society & Branch</th>
+                  <th className="py-4 px-6 text-right">Principal Amount</th>
+                  <th className="py-4 px-6 text-center">Status</th>
+                  <th className="py-4 px-6 text-right">Action</th>
                 </tr>
-              ) : filteredLoans.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-500">
-                    <AlertCircle className="w-12 h-12 mb-3 text-slate-600 mx-auto" />
-                    <p>No loan applications found.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredLoans.map((loan) => (
-                  <tr key={loan._id} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-mono text-emerald-400 font-medium mb-1">{loan.applicationId}</div>
-                      <div className="text-xs text-slate-400">{new Date(loan.applicationDate).toLocaleDateString()}</div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {loans.map((loan) => (
+                  <tr key={loan._id} className="hover:bg-teal-50/20 transition-colors">
+                    <td className="py-4 px-6">
+                      <div className="font-mono font-bold text-teal-800">{loan.applicationId}</div>
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" />
+                        <span>{new Date(loan.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-white">{loan.memberId?.fullName}</div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5">{loan.memberId?.memberId} • {loan.branchId?.branchName}</div>
+
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-slate-900">{loan.memberId?.fullName || 'N/A'}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        ID: {loan.memberId?.memberId || 'N/A'} {loan.memberId?.phone ? `• ${loan.memberId.phone}` : ''}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-slate-300 font-medium">{loan.loanTypeId?.name}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{loan.tenure} Months @ {loan.interestRate}%</div>
+
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-slate-800">{loan.loanTypeId?.name || 'Micro Credit'}</div>
+                      <div className="text-[10px] text-teal-800 font-semibold">{loan.interestRate || loan.loanTypeId?.interestRate || 12}% p.a. • {loan.tenureMonths || loan.tenure || 12} Mo</div>
                     </td>
-                    <td className="px-6 py-4 font-bold text-white">
-                      {formatCurrency(loan.requestedAmount)}
+
+                    <td className="py-4 px-6">
+                      <div className="text-slate-900 font-bold">{loan.organizationId?.name || 'Cooperative Society'}</div>
+                      <div className="text-[10px] text-slate-500">{loan.branchId?.branchName || 'Main Branch'}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${getStatusColor(loan.status)}`}>
-                        {loan.status}
+
+                    <td className="py-4 px-6 text-right font-mono font-bold text-slate-900">
+                      ₹ {(loan.principalAmount || loan.requestedAmount || 0).toLocaleString('en-IN')}
+                    </td>
+
+                    <td className="py-4 px-6 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                        loan.status === 'Active' || loan.status === 'Disbursed'
+                          ? 'bg-teal-50 text-teal-800 border-teal-200'
+                          : loan.status === 'Approved'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : loan.status === 'Returned'
+                          ? 'bg-amber-50 text-amber-900 border-amber-300 font-extrabold'
+                          : loan.status === 'Pending' || loan.status === 'Under Review'
+                          ? 'bg-blue-50 text-blue-800 border-blue-200'
+                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                      }`}>
+                        {loan.status === 'Returned' ? 'Returned' : loan.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+
+                    <td className="py-4 px-6 text-right">
                       <Link
                         to={`/loans/details/${loan._id}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 transition-colors"
-                        title="View Application"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 text-xs font-bold transition-all"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Details</span>
                       </Link>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination Controls */}
-        {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700/50 bg-slate-900/30">
-            <span className="text-sm text-slate-400">
-              Page <span className="font-medium text-white">{page}</span> of <span className="font-medium text-white">{totalPages}</span>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination Toolbar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-medium">
+              Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalRecords} items)
             </span>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 transition-colors"
               >
-                Previous
+                <ChevronLeft className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 transition-colors"
               >
-                Next
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
+
       </div>
+
     </div>
   );
 };
