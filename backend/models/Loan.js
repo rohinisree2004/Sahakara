@@ -11,6 +11,11 @@ const loanSchema = new mongoose.Schema({
     ref: 'Branch',
     required: true,
   },
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group',
+    index: true,
+  },
   memberId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Member',
@@ -28,8 +33,11 @@ const loanSchema = new mongoose.Schema({
   },
   requestedAmount: {
     type: Number,
-    required: true,
     min: 1,
+  },
+  principalAmount: {
+    type: Number,
+    default: 0,
   },
   approvedAmount: {
     type: Number,
@@ -49,7 +57,12 @@ const loanSchema = new mongoose.Schema({
   },
   tenure: {
     type: Number, // In months
-    required: true,
+  },
+  tenureMonths: {
+    type: Number,
+  },
+  eligibilityDetails: {
+    type: mongoose.Schema.Types.Mixed,
   },
   purpose: {
     type: String,
@@ -57,7 +70,7 @@ const loanSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Draft', 'Pending', 'Under Review', 'Recommended', 'Approved', 'Rejected', 'Disbursed', 'Active', 'Closed'],
+    enum: ['Draft', 'Pending', 'Under Review', 'Recommended', 'Approved', 'Rejected', 'Returned', 'Disbursed', 'Active', 'Closed'],
     default: 'Pending',
   },
   applicationDate: {
@@ -81,6 +94,29 @@ const loanSchema = new mongoose.Schema({
   remarks: {
     type: String,
   },
+  returnReason: {
+    type: String,
+  },
+  returnedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  returnedDate: {
+    type: Date,
+  },
+  resubmissionCount: {
+    type: Number,
+    default: 0,
+  },
+  lastResubmittedAt: {
+    type: Date,
+  },
+  cibilScore: {
+    type: Number,
+  },
+  cibilReport: {
+    type: mongoose.Schema.Types.Mixed,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -90,10 +126,35 @@ const loanSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  closureDate: {
+    type: Date,
+  },
+  closedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  closureRemarks: {
+    type: String,
+  },
   rejectionReason: {
     type: String,
   }
 }, { timestamps: true });
+
+loanSchema.pre('validate', function (next) {
+  if (!this.requestedAmount && this.principalAmount) {
+    this.requestedAmount = this.principalAmount;
+  } else if (!this.principalAmount && this.requestedAmount) {
+    this.principalAmount = this.requestedAmount;
+  }
+
+  if (!this.tenure && this.tenureMonths) {
+    this.tenure = this.tenureMonths;
+  } else if (!this.tenureMonths && this.tenure) {
+    this.tenureMonths = this.tenure;
+  }
+  next();
+});
 
 // Strict isolation index
 loanSchema.index({ organizationId: 1, branchId: 1, memberId: 1 });

@@ -18,7 +18,7 @@ const loanReviewSchema = new mongoose.Schema({
   },
   action: {
     type: String,
-    enum: ['Started Review', 'Recommended', 'Returned for Correction', 'Requested Additional Docs', 'Approved', 'Rejected'],
+    enum: ['Started Review', 'Recommended', 'Returned for Correction', 'Requested Additional Docs', 'Resubmitted after Correction', 'Approved', 'Rejected'],
     required: true,
   },
   remarks: {

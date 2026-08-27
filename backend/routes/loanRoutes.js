@@ -29,6 +29,8 @@ router.get('/dashboard', protect, checkPermission('Loan Management', 'read'), lo
 // ==============================
 // LOAN APPLICATION ROUTES
 // ==============================
+router.post('/apply', protect, checkPermission('Loan Management', 'create'), loanController.applyForLoan);
+
 router.route('/')
   .post(
     protect, 
@@ -51,10 +53,27 @@ router.route('/:id')
 // ==============================
 // LOAN REVIEW, APPROVAL, DISBURSE
 // ==============================
-router.post('/:id/review', protect, checkPermission('Loan Management', 'update'), loanController.reviewLoan);
-router.post('/:id/approve', protect, checkPermission('Loan Management', 'approve'), loanController.approveLoan);
-router.post('/:id/reject', protect, checkPermission('Loan Management', 'approve'), loanController.rejectLoan);
-router.post('/:id/disburse', protect, checkPermission('Loan Management', 'update'), loanController.disburseLoan);
+router.route('/:id/review')
+  .post(protect, checkPermission('Loan Management', 'update'), loanController.reviewLoan)
+  .put(protect, checkPermission('Loan Management', 'update'), loanController.reviewLoan);
+
+router.route('/:id/approve')
+  .post(protect, checkPermission('Loan Management', 'approve'), loanController.approveLoan)
+  .put(protect, checkPermission('Loan Management', 'approve'), loanController.approveLoan);
+
+router.route('/:id/reject')
+  .post(protect, checkPermission('Loan Management', 'approve'), loanController.rejectLoan)
+  .put(protect, checkPermission('Loan Management', 'approve'), loanController.rejectLoan);
+
+router.route('/:id/disburse')
+  .post(protect, checkPermission('Loan Management', 'update'), loanController.disburseLoan)
+  .put(protect, checkPermission('Loan Management', 'update'), loanController.disburseLoan);
+
+// ==============================
+// LOAN CIBIL & RESUBMISSION
+// ==============================
+router.get('/:id/cibil', protect, loanController.getCibilReport);
+router.put('/:id/resubmit', protect, loanController.resubmitLoan);
 
 // ==============================
 // LOAN DOCUMENTS UPLOAD (LOCAL STORAGE)
