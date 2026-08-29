@@ -3,6 +3,7 @@ const {
   generateSchedule,
   getSchedule,
   recordRepayment,
+  deductEmiFromSavings,
   getUpcomingEMIs,
   getOverdueEMIs,
   getRepaymentTransactions,
@@ -28,7 +29,8 @@ router.post('/:loanId/generate-schedule', checkPermission('Loans', 'create'), ge
 router.get('/loan/:loanId', checkPermission('Loans', 'read'), getSchedule);
 router.post('/:loanId/close', checkPermission('Loans', 'update'), closeLoan);
 
-// General repayment (expects loanId inside body)
+// General repayment & Savings Auto-Debit
 router.post('/', checkPermission('Loans', 'create'), recordRepayment);
+router.post('/deduct-from-savings', checkPermission('Loans', 'update'), deductEmiFromSavings);
 
 module.exports = router;

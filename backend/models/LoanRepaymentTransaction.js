@@ -38,7 +38,7 @@ const loanRepaymentTransactionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Cash', 'UPI', 'Bank Transfer', 'Other'],
+    enum: ['Cash', 'UPI', 'Bank Transfer', 'Savings Account Auto-Debit', 'Cheque', 'Other'],
     required: true,
   },
   referenceNumber: {
@@ -65,6 +65,5 @@ const loanRepaymentTransactionSchema = new mongoose.Schema({
 // Strict isolation index
 loanRepaymentTransactionSchema.index({ organizationId: 1, branchId: 1, loanId: 1 });
 loanRepaymentTransactionSchema.index({ memberId: 1 });
-loanRepaymentTransactionSchema.index({ transactionId: 1 });
 
 module.exports = mongoose.model('LoanRepaymentTransaction', loanRepaymentTransactionSchema);

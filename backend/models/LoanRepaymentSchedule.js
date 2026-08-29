@@ -51,16 +51,36 @@ const loanRepaymentScheduleSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Upcoming', 'Due', 'Partially Paid', 'Paid', 'Overdue', 'Waived'],
+    enum: ['Upcoming', 'Due', 'Partially Paid', 'Paid', 'Overdue', 'Waived', 'Auto-Deducted from Savings'],
     default: 'Upcoming',
   },
   paidDate: {
     type: Date,
   },
+  paymentMethod: {
+    type: String,
+    default: 'Cash',
+  },
+  deductedFromSavingsAccountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SavingsAccount',
+  },
+  deductedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  deductedAt: {
+    type: Date,
+  },
+  remarks: {
+    type: String,
+    trim: true,
+  }
 }, { timestamps: true });
 
 // Strict isolation index
 loanRepaymentScheduleSchema.index({ organizationId: 1, branchId: 1, loanId: 1, emiNumber: 1 });
 loanRepaymentScheduleSchema.index({ memberId: 1 });
+loanRepaymentScheduleSchema.index({ loanId: 1, status: 1 });
 
 module.exports = mongoose.model('LoanRepaymentSchedule', loanRepaymentScheduleSchema);
