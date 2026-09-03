@@ -9,6 +9,7 @@ const {
   createMeeting,
   updateMeeting,
   cancelMeeting,
+  endMeeting,
   addAgendaItem,
   updateAgendaItem,
   deleteAgendaItem,
@@ -37,35 +38,36 @@ router.get('/participants/search', searchParticipants);
 // Meetings List & Create
 router.route('/')
   .get(getMeetingsList)
-  .post(authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), createMeeting);
+  .post(authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), createMeeting);
 
 // Single Meeting Operations
 router.route('/:id')
   .get(getMeetingDetails)
-  .put(authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), updateMeeting);
+  .put(authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), updateMeeting);
 
-router.post('/:id/cancel', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), cancelMeeting);
+router.post('/:id/cancel', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), cancelMeeting);
+router.post('/:id/end', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer', 'Employee'), endMeeting);
 
 // Agenda
-router.post('/:id/agenda', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), addAgendaItem);
-router.put('/:id/agenda/:agendaId', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), updateAgendaItem);
-router.delete('/:id/agenda/:agendaId', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), deleteAgendaItem);
+router.post('/:id/agenda', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), addAgendaItem);
+router.put('/:id/agenda/:agendaId', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), updateAgendaItem);
+router.delete('/:id/agenda/:agendaId', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), deleteAgendaItem);
 
 // Participants
-router.post('/:id/participants', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), addParticipants);
-router.delete('/:id/participants/:participantId', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), removeParticipant);
+router.post('/:id/participants', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), addParticipants);
+router.delete('/:id/participants/:participantId', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), removeParticipant);
 
 // Attendance
 router.get('/:id/attendance', getAttendance);
-router.post('/:id/attendance', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), markAttendance);
+router.post('/:id/attendance', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), markAttendance);
 
 // Minutes
-router.post('/:id/minutes', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), saveMinutes);
-router.post('/:id/minutes/finalize', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), finalizeMinutes);
+router.post('/:id/minutes', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), saveMinutes);
+router.post('/:id/minutes/finalize', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), finalizeMinutes);
 
 // Action Items
-router.post('/:id/action-items', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), addActionItem);
-router.put('/:id/action-items/:itemId', authorize('Super Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager'), updateActionItem);
+router.post('/:id/action-items', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), addActionItem);
+router.put('/:id/action-items/:itemId', authorize('Super Admin', 'Organization Admin', 'Org Admin', 'President', 'Secretary', 'Branch Manager', 'Treasurer'), updateActionItem);
 
 // Documents
 router.post('/:id/documents', upload.single('file'), uploadDocument);

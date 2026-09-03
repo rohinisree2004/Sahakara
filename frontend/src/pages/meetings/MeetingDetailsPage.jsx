@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   fetchMeetingDetails, 
   cancelMeeting, 
+  endMeetingApi,
   addAgendaItem, 
   deleteAgendaItem, 
   addParticipants, 
@@ -22,7 +23,7 @@ import {
   UserCheck, 
   FileText, 
   Upload, 
-  CheckCircle, 
+  CheckCircle2, 
   XCircle, 
   Plus, 
   Trash2, 
@@ -30,7 +31,16 @@ import {
   ArrowLeft, 
   Lock, 
   AlertCircle,
-  FileDown
+  Building2,
+  Users,
+  Printer,
+  Sparkles,
+  CheckCircle,
+  ShieldCheck,
+  Download,
+  FileCheck,
+  HelpCircle,
+  X
 } from 'lucide-react';
 
 const MeetingDetailsPage = () => {
@@ -40,18 +50,22 @@ const MeetingDetailsPage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('Overview'); // Overview, Attendance, Minutes, Documents
+  const [successMsg, setSuccessMsg] = useState('');
+  const [activeTab, setActiveTab] = useState('Overview'); // Overview, Attendance, Minutes, Documents, ActionItems
 
   // Agenda State
   const [newAgendaTitle, setNewAgendaTitle] = useState('');
   const [newAgendaDesc, setNewAgendaDesc] = useState('');
+  const [addingAgenda, setAddingAgenda] = useState(false);
 
   // Participant Search State
   const [pSearch, setPSearch] = useState('');
   const [pResults, setPResults] = useState([]);
+  const [invitingParticipant, setInvitingParticipant] = useState(false);
 
   // Attendance Form State
   const [attendanceMap, setAttendanceMap] = useState({});
+  const [savingAttendance, setSavingAttendance] = useState(false);
 
   // Minutes Form State
   const [minuteForm, setMinuteForm] = useState({
@@ -60,10 +74,14 @@ const MeetingDetailsPage = () => {
     decisions: '',
     resolutions: ''
   });
+  const [savingMinutes, setSavingMinutes] = useState(false);
+  const [finalizingMinutes, setFinalizingMinutes] = useState(false);
 
   // Action Item State
   const [newActionTask, setNewActionTask] = useState('');
   const [newActionDueDate, setNewActionDueDate] = useState('');
+  const [newActionRemarks, setNewActionRemarks] = useState('');
+  const [addingAction, setAddingAction] = useState(false);
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState(null);
@@ -71,29 +89,38 @@ const MeetingDetailsPage = () => {
   const [uploading, setUploading] = useState(false);
 
   const loadDetails = async () => {
+    setLoading(true);
+    setError('');
     try {
       const res = await fetchMeetingDetails(id);
-      setData(res.data);
+      if (res.data && res.data.success) {
+        const payload = res.data.data;
+        setData(payload);
 
-      if (res.data.minutes) {
-        setMinuteForm({
-          summary: res.data.minutes.summary || '',
-          discussions: res.data.minutes.discussions || '',
-          decisions: res.data.minutes.decisions || '',
-          resolutions: res.data.minutes.resolutions || ''
-        });
+        if (payload.minutes) {
+          setMinuteForm({
+            summary: payload.minutes.summary || '',
+            discussions: payload.minutes.discussions || '',
+            decisions: payload.minutes.decisions || '',
+            resolutions: payload.minutes.resolutions || ''
+          });
+        }
+
+        // Pre-fill attendance map
+        const initialAttMap = {};
+        if (payload.participants) {
+          payload.participants.forEach(p => {
+            initialAttMap[String(p.participantId)] = {
+              participantType: p.participantType,
+              attendanceStatus: p.attendanceStatus || 'Absent',
+              remarks: p.remarks || ''
+            };
+          });
+        }
+        setAttendanceMap(initialAttMap);
       }
-
-      // Initialize Attendance Map
-      const initialMap = {};
-      (res.data.participants || []).forEach(p => {
-        const record = (res.data.attendance || []).find(a => a.participantId?.toString() === p.participantId?.toString());
-        initialMap[p.participantId] = record ? record.attendanceStatus : 'Absent';
-      });
-      setAttendanceMap(initialMap);
-
     } catch (err) {
-      setError(err.message || 'Failed to load meeting details');
+      setError(err.message || 'Failed to load meeting details.');
     } finally {
       setLoading(false);
     }
@@ -103,689 +130,923 @@ const MeetingDetailsPage = () => {
     loadDetails();
   }, [id]);
 
-  // Handle participant search
+  // Debounced search for adding participants
   useEffect(() => {
-    if (!pSearch.trim()) {
+    if (!pSearch.trim() || !data?.meeting?.organizationId) {
       setPResults([]);
       return;
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await searchParticipants(pSearch);
-        setPResults(res.data || []);
+        const res = await searchParticipants({
+          query: pSearch,
+          organizationId: data.meeting.organizationId._id || data.meeting.organizationId
+        });
+        if (res.data?.success) {
+          setPResults(res.data.data || []);
+        }
       } catch (err) {
-        console.error(err);
+        console.error('Participant search error', err);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [pSearch]);
+  }, [pSearch, data?.meeting?.organizationId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="p-6">
-        <div className="bg-rose-500/10 border border-rose-500 text-rose-400 p-4 rounded-xl">
-          {error || 'Meeting not found.'}
-        </div>
-      </div>
-    );
-  }
-
-  const { meeting, agendas = [], participants = [], attendance = [], minutes, actionItems = [], documents = [] } = data;
-  const isFinalized = minutes?.finalized || false;
-
-  // Handler Actions
-  const handleCancelMeeting = async () => {
-    if (window.confirm('Are you sure you want to cancel this meeting?')) {
-      try {
-        await cancelMeeting(id);
-        loadDetails();
-      } catch (err) {
-        alert(err.message);
-      }
-    }
-  };
-
+  // 1. Agenda Handlers
   const handleAddAgenda = async (e) => {
     e.preventDefault();
     if (!newAgendaTitle.trim()) return;
+    setAddingAgenda(true);
     try {
       await addAgendaItem(id, { title: newAgendaTitle, description: newAgendaDesc });
       setNewAgendaTitle('');
       setNewAgendaDesc('');
+      setSuccessMsg('Agenda item added successfully');
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to add agenda item');
+    } finally {
+      setAddingAgenda(false);
     }
   };
 
   const handleDeleteAgenda = async (agendaId) => {
+    if (!window.confirm('Delete this agenda item?')) return;
     try {
       await deleteAgendaItem(id, agendaId);
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to delete agenda item');
     }
   };
 
-  const handleAddParticipant = async (p) => {
+  // 2. Participant Handlers
+  const handleInviteParticipant = async (p) => {
     try {
       await addParticipants(id, [{ participantType: p.participantType, participantId: p.participantId }]);
       setPSearch('');
       setPResults([]);
+      setSuccessMsg(`Invited ${p.name}`);
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to invite participant');
     }
   };
 
-  const handleRemoveParticipant = async (participantId) => {
+  const handleRemoveParticipant = async (pId) => {
+    if (!window.confirm('Remove participant from meeting roster?')) return;
     try {
-      await removeParticipant(id, participantId);
+      await removeParticipant(id, pId);
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to remove participant');
     }
+  };
+
+  // 3. Attendance Handlers
+  const handleAttendanceChange = (pId, status) => {
+    setAttendanceMap(prev => ({
+      ...prev,
+      [pId]: {
+        ...prev[pId],
+        attendanceStatus: status
+      }
+    }));
   };
 
   const handleSaveAttendance = async () => {
+    setSavingAttendance(true);
+    setError('');
+    setSuccessMsg('');
     try {
-      const records = participants.map(p => ({
-        participantType: p.participantType,
-        participantId: p.participantId,
-        attendanceStatus: attendanceMap[p.participantId] || 'Absent'
+      const records = Object.entries(attendanceMap).map(([participantId, val]) => ({
+        participantId,
+        participantType: val.participantType || 'Member',
+        attendanceStatus: val.attendanceStatus || 'Absent',
+        remarks: val.remarks || ''
       }));
+
       await markAttendance(id, records);
-      alert('Attendance updated successfully');
+      setSuccessMsg('Attendance roll-call saved successfully!');
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to save attendance');
+    } finally {
+      setSavingAttendance(false);
     }
   };
 
+  // 4. Minutes Handlers
   const handleSaveMinutes = async (e) => {
     e.preventDefault();
+    setSavingMinutes(true);
+    setError('');
+    setSuccessMsg('');
     try {
       await saveMinutes(id, minuteForm);
-      alert('Draft minutes saved successfully');
+      setSuccessMsg('Draft minutes saved successfully');
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to save minutes');
+    } finally {
+      setSavingMinutes(false);
     }
   };
 
   const handleFinalizeMinutes = async () => {
-    if (window.confirm('Finalizing will lock these meeting minutes and mark the meeting as Completed. Continue?')) {
-      try {
-        await finalizeMinutes(id);
-        alert('Meeting minutes finalized and locked.');
-        loadDetails();
-      } catch (err) {
-        alert(err.message);
-      }
+    if (!window.confirm('Finalizing will permanently lock these minutes and mark the meeting as Officially Completed. Proceed?')) return;
+    setFinalizingMinutes(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      await finalizeMinutes(id);
+      setSuccessMsg('Minutes finalized, signed, and locked. Meeting marked Completed.');
+      loadDetails();
+    } catch (err) {
+      setError(err.message || 'Failed to finalize minutes');
+    } finally {
+      setFinalizingMinutes(false);
     }
   };
 
-  const handleAddActionItem = async (e) => {
+  // 5. Action Items Handler
+  const handleAddAction = async (e) => {
     e.preventDefault();
     if (!newActionTask.trim()) return;
+    setAddingAction(true);
     try {
-      await addActionItem(id, { task: newActionTask, dueDate: newActionDueDate });
+      await addActionItem(id, {
+        task: newActionTask,
+        dueDate: newActionDueDate || undefined,
+        remarks: newActionRemarks
+      });
       setNewActionTask('');
       setNewActionDueDate('');
+      setNewActionRemarks('');
+      setSuccessMsg('Action item registered');
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to register action item');
+    } finally {
+      setAddingAction(false);
     }
   };
 
-  const handleUpdateActionStatus = async (itemId, newStatus) => {
-    try {
-      await updateActionItem(id, itemId, { status: newStatus });
-      loadDetails();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
+  // 6. Document Upload Handler
+  const handleUploadDoc = async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
     setUploading(true);
+    setError('');
+    setSuccessMsg('');
     try {
-      const fd = new FormData();
-      fd.append('file', selectedFile);
-      fd.append('documentType', docType);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('documentType', docType);
 
-      await uploadMeetingDocument(id, fd);
+      await uploadMeetingDocument(id, formData);
       setSelectedFile(null);
+      setSuccessMsg('Document attached successfully');
       loadDetails();
     } catch (err) {
-      alert(err.message);
+      setError(err.message || 'Failed to upload document');
     } finally {
       setUploading(false);
     }
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Top Navigation */}
-      <div>
-        <Link to="/meetings/dashboard" className="text-xs font-semibold text-slate-400 hover:text-emerald-400 flex items-center gap-1 mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to Governance Hub
+  // 7. Meeting Cancellation
+  const handleCancelMeeting = async () => {
+    if (!window.confirm('Are you sure you want to cancel this meeting?')) return;
+    try {
+      await cancelMeeting(id);
+      setSuccessMsg('Meeting has been cancelled.');
+      loadDetails();
+    } catch (err) {
+      setError(err.message || 'Failed to cancel meeting.');
+    }
+  };
+
+  // 8. Mark Meeting as Ended
+  const handleEndMeeting = async () => {
+    if (!window.confirm('Mark this assembly as Officially Ended / Concluded?')) return;
+    try {
+      await endMeetingApi(id);
+      setSuccessMsg('Assembly marked as Ended / Completed successfully.');
+      loadDetails();
+    } catch (err) {
+      setError(err.message || 'Failed to mark meeting as ended.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white p-12 rounded-3xl border border-teal-100/80 text-center space-y-3 max-w-5xl mx-auto my-12">
+        <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm font-bold text-slate-700">Loading meeting governance desk...</p>
+      </div>
+    );
+  }
+
+  if (!data?.meeting) {
+    return (
+      <div className="bg-white p-12 rounded-3xl border border-teal-100/80 text-center space-y-4 max-w-5xl mx-auto my-12">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Meeting Not Found</h2>
+        <Link to="/meetings" className="inline-flex px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold">
+          Back to Meetings Registry
         </Link>
+      </div>
+    );
+  }
+
+  const { meeting, agendas = [], participants = [], minutes, actionItems = [], documents = [], quorumStats } = data;
+  const isFinalized = minutes?.finalized;
+  const isConcluded = meeting.status === 'Completed' || meeting.status === 'Ended';
+
+  return (
+    <div className="space-y-8 max-w-6xl mx-auto pb-16">
+      
+      {/* Top Header Card */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-100">{meeting.title}</h1>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${
-                meeting.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
-                meeting.status === 'Scheduled' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                'bg-rose-500/10 text-rose-400 border-rose-500/30'
-              }`}>
-                {meeting.status}
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs font-mono mt-1">
-              ID: {meeting.meetingId} | Type: {meeting.meetingType} | Date: {new Date(meeting.date).toLocaleDateString()} ({meeting.startTime} - {meeting.endTime})
-            </p>
-          </div>
+          <Link
+            to="/meetings"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-800 transition-colors uppercase tracking-wider"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Meetings Registry
+          </Link>
 
           <div className="flex items-center gap-2">
-            {!isFinalized && meeting.status !== 'Cancelled' && (
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-all"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print Summary
+            </button>
+            {meeting.status !== 'Cancelled' && !isConcluded && (
+              <button
+                onClick={handleEndMeeting}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Mark as Ended
+              </button>
+            )}
+            {meeting.status !== 'Cancelled' && !isFinalized && !isConcluded && (
               <button
                 onClick={handleCancelMeeting}
-                className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition-all"
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-xs font-bold border border-rose-200 transition-all"
               >
-                Cancel Session
+                Cancel Assembly
               </button>
             )}
           </div>
         </div>
+
+        {/* Title, Badges & Society Context */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold font-mono px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              {meeting.meetingId}
+            </span>
+            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-teal-900 text-white border border-teal-800">
+              {meeting.meetingType}
+            </span>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+              meeting.status === 'Completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+              meeting.status === 'Ongoing' ? 'bg-amber-50 text-amber-800 border-amber-200 animate-pulse' :
+              meeting.status === 'Cancelled' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-teal-50 text-teal-800 border-teal-200'
+            }`}>
+              {meeting.status}
+            </span>
+            {isFinalized && (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Minutes Signed & Locked
+              </span>
+            )}
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            {meeting.title}
+          </h1>
+
+          <p className="text-sm font-medium text-slate-600 flex items-center gap-2 flex-wrap pt-1">
+            <Building2 className="w-4 h-4 text-teal-600 shrink-0" />
+            <span className="font-bold text-slate-800">{meeting.organizationId?.name || 'Society'}</span>
+            {meeting.branchId && (
+              <>
+                <span>•</span>
+                <span>Branch: <strong className="text-slate-800">{meeting.branchId.branchName}</strong></span>
+              </>
+            )}
+            {meeting.groupId && (
+              <>
+                <span>•</span>
+                <span className="text-emerald-800 font-bold">Group: {meeting.groupId.groupName}</span>
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Schedule & Venue Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Date</p>
+              <p className="text-xs font-bold text-slate-900">{new Date(meeting.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Time Slot</p>
+              <p className="text-xs font-bold text-slate-900">{meeting.startTime} - {meeting.endTime}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div className="truncate">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Venue</p>
+              <p className="text-xs font-bold text-slate-900 truncate">{meeting.venue}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Primary Tab Navigation */}
-      <div className="border-b border-slate-700/80 flex gap-2">
-        {['Overview', 'Attendance', 'Minutes & Action Items', 'Documents'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === tab 
-                ? 'border-emerald-500 text-emerald-400 bg-slate-800/40' 
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      {error && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
+          <span className="font-semibold">{error}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-sm flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-teal-600" />
+          <span className="font-bold">{successMsg}</span>
+        </div>
+      )}
+
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        {[
+          { id: 'Overview', label: 'Agendas & Overview', icon: FileText, count: agendas.length },
+          { id: 'Attendance', label: 'Attendees & Quorum', icon: UserCheck, count: participants.length },
+          { id: 'Minutes', label: 'Minutes & Resolutions', icon: ShieldCheck, isBadge: isFinalized },
+          { id: 'ActionItems', label: 'Action Items & Directives', icon: FileCheck, count: actionItems.length },
+          { id: 'Documents', label: 'Documents & Records', icon: Upload, count: documents.length }
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                isActive 
+                  ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20' 
+                  : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+              {tab.count !== undefined && (
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+              {tab.isBadge && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-900 font-bold font-mono">
+                  Locked
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* TAB 1: OVERVIEW & AGENDAS */}
       {activeTab === 'Overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-4">
-              <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-3">Session Details</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-slate-400 text-xs block">Venue / Location</span>
-                  <span className="text-slate-100 font-semibold flex items-center gap-1.5 mt-0.5">
-                    <MapPin className="w-4 h-4 text-rose-400" /> {meeting.venue}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-xs block">Organizer</span>
-                  <span className="text-slate-100 font-semibold mt-0.5">
-                    {meeting.organizerId ? `${meeting.organizerId.firstName} ${meeting.organizerId.lastName}` : 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-xs block">Branch Context</span>
-                  <span className="text-slate-100 font-semibold mt-0.5">
-                    {meeting.branchId ? meeting.branchId.name : 'All Branches'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-xs block">Group Context</span>
-                  <span className="text-slate-100 font-semibold mt-0.5">
-                    {meeting.groupId ? meeting.groupId.name : 'N/A'}
-                  </span>
-                </div>
-              </div>
+        <div className="space-y-8">
+          {/* Description */}
+          {meeting.description && (
+            <div className="bg-white p-6 rounded-3xl border border-teal-100/80 shadow-xs space-y-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Context & Meeting Note</h3>
+              <p className="text-sm text-slate-700 leading-relaxed font-medium">{meeting.description}</p>
+            </div>
+          )}
 
-              {meeting.description && (
-                <div className="pt-2 border-t border-slate-700/60">
-                  <span className="text-slate-400 text-xs block mb-1">Description</span>
-                  <p className="text-sm text-slate-300 leading-relaxed">{meeting.description}</p>
-                </div>
+          {/* Agendas Section */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-teal-600" />
+                  <span>Structured Order of Business / Agendas ({agendas.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Formal motions and deliberation items scheduled for this assembly.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {agendas.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">No agendas registered for this meeting.</p>
+              ) : (
+                agendas.map((ag, idx) => (
+                  <div key={ag._id || idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      <span className="w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center font-mono shrink-0 mt-0.5">
+                        {ag.order || idx + 1}
+                      </span>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-slate-900">{ag.title}</h4>
+                        {ag.description && (
+                          <p className="text-xs text-slate-600 font-medium leading-relaxed">{ag.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    {!isFinalized && (
+                      <button
+                        onClick={() => handleDeleteAgenda(ag._id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete Agenda"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))
               )}
             </div>
 
-            {/* Agenda Topics */}
-            <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-4">
-              <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-3 flex justify-between items-center">
-                <span>Agenda Topics ({agendas.length})</span>
-              </h2>
-
-              <div className="space-y-3">
-                {agendas.length === 0 ? (
-                  <div className="text-sm text-slate-500 py-4 text-center">No agenda topics defined yet.</div>
-                ) : (
-                  agendas.map((ag, idx) => (
-                    <div key={ag._id} className="p-3.5 bg-slate-900/60 border border-slate-700/60 rounded-xl flex justify-between items-start">
-                      <div className="flex gap-3">
-                        <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-400 font-bold text-xs flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold text-white">{ag.title}</h4>
-                          {ag.description && <p className="text-xs text-slate-400 mt-1">{ag.description}</p>}
-                        </div>
-                      </div>
-                      {!isFinalized && (
-                        <button
-                          onClick={() => handleDeleteAgenda(ag._id)}
-                          className="text-slate-500 hover:text-rose-400 p-1"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-
-                {/* Add Agenda Form */}
-                {!isFinalized && (
-                  <form onSubmit={handleAddAgenda} className="pt-3 border-t border-slate-700/60 space-y-2">
-                    <div className="text-xs font-bold text-slate-300">Add Agenda Item:</div>
-                    <input
-                      type="text"
-                      placeholder="Topic Title..."
-                      value={newAgendaTitle}
-                      onChange={(e) => setNewAgendaTitle(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    />
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Description (optional)..."
-                        value={newAgendaDesc}
-                        onChange={(e) => setNewAgendaDesc(e.target.value)}
-                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shrink-0"
-                      >
-                        + Add Topic
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Side Info */}
-          <div className="space-y-6">
-            <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-3 text-xs">
-              <h3 className="font-bold text-white text-sm border-b border-slate-700 pb-2">Session Quick Overview</h3>
-              <div className="flex justify-between py-1 border-b border-slate-700/40">
-                <span className="text-slate-400">Total Invited:</span>
-                <span className="font-bold text-white">{participants.length}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-700/40">
-                <span className="text-slate-400">Agendas Listed:</span>
-                <span className="font-bold text-white">{agendas.length}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-700/40">
-                <span className="text-slate-400">Action Items:</span>
-                <span className="font-bold text-white">{actionItems.length}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-400">Minutes Finalized:</span>
-                <span className={`font-bold ${isFinalized ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {isFinalized ? 'Yes (Locked)' : 'Draft Mode'}
-                </span>
-              </div>
-            </div>
+            {/* Add Agenda Form */}
+            {!isFinalized && (
+              <form onSubmit={handleAddAgenda} className="p-4 rounded-2xl bg-teal-50/50 border border-teal-200/80 space-y-3">
+                <h4 className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Append New Agenda Item
+                </h4>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Agenda Item Title (e.g. Allocation of Statutory Reserves)"
+                    value={newAgendaTitle}
+                    onChange={(e) => setNewAgendaTitle(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs font-bold focus:border-teal-500 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Brief description or motion specifics (optional)..."
+                    value={newAgendaDesc}
+                    onChange={(e) => setNewAgendaDesc(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-medium focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={addingAgenda || !newAgendaTitle.trim()}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    {addingAgenda ? 'Adding...' : 'Add Agenda Item'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* TAB 2: ATTENDANCE */}
+      {/* TAB 2: ATTENDEES & QUORUM ROLL-CALL */}
       {activeTab === 'Attendance' && (
-        <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-emerald-400" />
-                Participant Attendance Desk
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Mark present, absent, excused, or late statuses</p>
-            </div>
-
-            {!isFinalized && (
-              <button
-                onClick={handleSaveAttendance}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20"
-              >
-                Save Attendance Records
-              </button>
-            )}
-          </div>
-
-          {/* Add Participant Drawer */}
-          {!isFinalized && (
-            <div className="p-4 bg-slate-900/60 border border-slate-700/60 rounded-xl space-y-3">
-              <label className="block text-xs font-bold text-slate-300">Invite Additional Participant</label>
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search user or member to invite..."
-                  value={pSearch}
-                  onChange={(e) => setPSearch(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
+        <div className="space-y-8">
+          
+          {/* Quorum Progress Banner */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-teal-600" />
+                  <span>Quorum & Attendance Roll-Call Desk</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Statutory requirement for General Meetings & AGMs. A minimum 50% attendance establishes a legal quorum.
+                </p>
               </div>
 
+              <button
+                onClick={handleSaveAttendance}
+                disabled={savingAttendance}
+                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-teal-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {savingAttendance ? 'Saving Roll-Call...' : 'Save Attendance Roll-Call'}
+              </button>
+            </div>
+
+            {/* Quorum Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Invited Roster</span>
+                <p className="text-2xl font-extrabold text-slate-900">{quorumStats?.totalInvited || participants.length}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase">Present</span>
+                <p className="text-2xl font-extrabold text-emerald-900">{quorumStats?.presentCount || 0}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+                <span className="text-[10px] font-bold text-rose-700 uppercase">Absent</span>
+                <p className="text-2xl font-extrabold text-rose-900">{quorumStats?.absentCount || 0}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-center">
+                <span className="text-[10px] font-bold text-teal-700 uppercase">Quorum Rate</span>
+                <p className="text-2xl font-extrabold text-teal-900">{quorumStats?.quorumPercentage || 0}%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Add Participant Box */}
+          <div className="bg-white p-6 rounded-3xl border border-teal-100/80 shadow-xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Invite Additional Member or Staff Officer
+            </h4>
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+              <input
+                type="text"
+                placeholder="Search member by Name, Member ID, or Phone..."
+                value={pSearch}
+                onChange={(e) => setPSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:bg-white focus:border-teal-500 focus:outline-none"
+              />
+
               {pResults.length > 0 && (
-                <div className="bg-slate-800 border border-slate-700 rounded-lg max-h-40 overflow-y-auto divide-y divide-slate-700">
-                  {pResults.map((r, i) => (
+                <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-56 overflow-y-auto p-2 space-y-1">
+                  {pResults.map(p => (
                     <div
-                      key={i}
-                      onClick={() => handleAddParticipant(r)}
-                      className="p-2 hover:bg-slate-700/60 cursor-pointer flex justify-between items-center text-xs text-white"
+                      key={p.participantId}
+                      onClick={() => handleInviteParticipant(p)}
+                      className="p-3 hover:bg-teal-50 rounded-xl cursor-pointer flex items-center justify-between text-xs transition-colors"
                     >
-                      <span>{r.name} ({r.subText})</span>
-                      <span className="text-emerald-400 font-bold">+ Invite</span>
+                      <div>
+                        <p className="font-bold text-slate-900">{p.name}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{p.subText}</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full font-bold uppercase bg-slate-100 text-slate-700 text-[10px]">
+                        + Add to Roster
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Attendance Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="bg-slate-900/60 text-xs font-bold text-slate-400 border-b border-slate-700 uppercase">
-                  <th className="p-3">Participant Name</th>
-                  <th className="p-3">Type</th>
-                  <th className="p-3">Attendance Status</th>
-                  {!isFinalized && <th className="p-3 text-right">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {participants.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="text-center py-8 text-slate-500 text-xs">No participants invited.</td>
+          {/* Roster Roll-Call Table */}
+          <div className="bg-white rounded-3xl border border-teal-100/80 shadow-xs overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h4 className="text-sm font-bold text-slate-900">
+                Official Invitee Roll-Call ({participants.length})
+              </h4>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold">
+                    <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Invitee Name</th>
+                    <th className="py-3 px-4">Type & Contact</th>
+                    <th className="py-3 px-4 text-center">Attendance Roll-Call</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  participants.map((p) => (
-                    <tr key={p.participantId} className="hover:bg-slate-700/20">
-                      <td className="p-3 font-semibold text-white">
-                        {p.participantDetails ? `${p.participantDetails.firstName} ${p.participantDetails.lastName}` : p.participantId}
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {participants.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        No participants registered in this roster.
                       </td>
-                      <td className="p-3 text-xs text-slate-400 font-mono">{p.participantType}</td>
-                      <td className="p-3">
-                        <select
-                          disabled={isFinalized}
-                          value={attendanceMap[p.participantId] || 'Absent'}
-                          onChange={(e) => setAttendanceMap(prev => ({ ...prev, [p.participantId]: e.target.value }))}
-                          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="Present">Present</option>
-                          <option value="Absent">Absent</option>
-                          <option value="Excused">Excused</option>
-                          <option value="Late">Late</option>
-                        </select>
-                      </td>
-                      {!isFinalized && (
-                        <td className="p-3 text-right">
-                          <button
-                            onClick={() => handleRemoveParticipant(p.participantId)}
-                            className="text-slate-500 hover:text-rose-400"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    participants.map((p, idx) => {
+                      const pId = String(p.participantId);
+                      const currentStatus = attendanceMap[pId]?.attendanceStatus || 'Absent';
+                      const details = p.participantDetails;
+                      const name = details?.fullName || details?.name || `${details?.firstName || ''} ${details?.lastName || ''}`.trim() || 'Invitee';
+
+                      return (
+                        <tr key={pId || idx} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 font-bold text-slate-400 font-mono">{idx + 1}</td>
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {p.participantType === 'Member' ? `Member ID: ${details?.memberId || 'N/A'}` : `Role: ${details?.role || 'Staff'}`}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 mr-2">
+                              {p.participantType}
+                            </span>
+                            <span className="text-slate-500 font-mono">{details?.phone || details?.email || '-'}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {['Present', 'Absent', 'Late', 'Excused'].map(st => (
+                                <button
+                                  key={st}
+                                  type="button"
+                                  onClick={() => handleAttendanceChange(pId, st)}
+                                  className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                                    currentStatus === st
+                                      ? st === 'Present' ? 'bg-emerald-600 text-white border-emerald-600'
+                                        : st === 'Absent' ? 'bg-rose-600 text-white border-rose-600'
+                                        : st === 'Late' ? 'bg-amber-600 text-white border-amber-600'
+                                        : 'bg-purple-600 text-white border-purple-600'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {st}
+                                </button>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleRemoveParticipant(pId)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              title="Remove Participant"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: MINUTES & ACTION ITEMS */}
-      {activeTab === 'Minutes & Action Items' && (
-        <div className="space-y-6">
-          {/* Minutes Form */}
-          <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <FileText className="w-5 h-5 text-emerald-400" />
-                Official Meeting Minutes & Resolutions
-              </h2>
+      {/* TAB 3: MINUTES & RESOLUTIONS */}
+      {activeTab === 'Minutes' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-teal-600" />
+                <span>Statutory Meeting Minutes & Adopted Resolutions</span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Official minutes book of discussions, voting results, and formal governance resolutions.
+              </p>
+            </div>
 
-              {isFinalized ? (
-                <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full text-xs font-bold flex items-center gap-1">
-                  <Lock className="w-3 h-3" /> Minutes Finalized & Locked
-                </span>
-              ) : (
+            {isFinalized ? (
+              <span className="text-xs font-bold text-purple-900 bg-purple-50 px-3.5 py-1.5 rounded-full border border-purple-200 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" /> Finalized & Signed
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
                 <button
+                  type="button"
+                  onClick={handleSaveMinutes}
+                  disabled={savingMinutes}
+                  className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all"
+                >
+                  {savingMinutes ? 'Saving Draft...' : 'Save Draft'}
+                </button>
+                <button
+                  type="button"
                   onClick={handleFinalizeMinutes}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow"
+                  disabled={finalizingMinutes || !minuteForm.summary}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-teal-600/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Finalize & Lock Minutes
+                  <Lock className="w-3.5 h-3.5" />
+                  {finalizingMinutes ? 'Finalizing...' : 'Adopt & Lock Minutes'}
                 </button>
-              )}
-            </div>
-
-            <form onSubmit={handleSaveMinutes} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Meeting Executive Summary *</label>
-                <textarea
-                  disabled={isFinalized}
-                  required
-                  rows="3"
-                  value={minuteForm.summary}
-                  onChange={(e) => setMinuteForm(prev => ({ ...prev, summary: e.target.value }))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60 resize-none"
-                  placeholder="Overview of key discussion points..."
-                ></textarea>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Main Discussions</label>
-                  <textarea
-                    disabled={isFinalized}
-                    rows="4"
-                    value={minuteForm.discussions}
-                    onChange={(e) => setMinuteForm(prev => ({ ...prev, discussions: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60 resize-none"
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Decisions Taken</label>
-                  <textarea
-                    disabled={isFinalized}
-                    rows="4"
-                    value={minuteForm.decisions}
-                    onChange={(e) => setMinuteForm(prev => ({ ...prev, decisions: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60 resize-none"
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Resolutions Passed</label>
-                  <textarea
-                    disabled={isFinalized}
-                    rows="4"
-                    value={minuteForm.resolutions}
-                    onChange={(e) => setMinuteForm(prev => ({ ...prev, resolutions: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60 resize-none"
-                  ></textarea>
-                </div>
-              </div>
-
-              {!isFinalized && (
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs rounded-xl"
-                  >
-                    Save Draft Minutes
-                  </button>
-                </div>
-              )}
-            </form>
+            )}
           </div>
 
-          {/* Action Items List */}
-          <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-3">
-              Action Items & Assigned Tasks ({actionItems.length})
-            </h2>
-
-            <div className="space-y-3">
-              {actionItems.length === 0 ? (
-                <div className="text-xs text-slate-500 py-4 text-center">No action items logged.</div>
-              ) : (
-                actionItems.map((item) => (
-                  <div key={item._id} className="p-3 bg-slate-900/60 border border-slate-700/60 rounded-xl flex justify-between items-center">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">{item.task}</h4>
-                      {item.dueDate && (
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          Due: {new Date(item.dueDate).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                    <select
-                      value={item.status}
-                      onChange={(e) => handleUpdateActionStatus(item._id, e.target.value)}
-                      className="bg-slate-800 border border-slate-700 text-xs rounded px-2 py-1 text-white"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                  </div>
-                ))
-              )}
-
-              {/* Add Action Item Form */}
-              <form onSubmit={handleAddActionItem} className="pt-3 border-t border-slate-700/60 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Task description..."
-                  value={newActionTask}
-                  onChange={(e) => setNewActionTask(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <input
-                  type="date"
-                  value={newActionDueDate}
-                  onChange={(e) => setNewActionDueDate(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg shrink-0"
-                >
-                  + Add Action Task
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: DOCUMENTS */}
-      {activeTab === 'Documents' && (
-        <div className="bg-slate-800/90 border border-slate-700/90 rounded-2xl p-6 space-y-6">
-          <h2 className="text-lg font-bold text-white border-b border-slate-700 pb-3 flex items-center gap-2">
-            <Upload className="w-5 h-5 text-emerald-400" />
-            Supporting Meeting Documents
-          </h2>
-
-          {/* Upload Form */}
-          <form onSubmit={handleFileUpload} className="p-4 bg-slate-900/60 border border-slate-700/60 rounded-xl flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-bold text-slate-300 mb-1">Document Category</label>
-              <select
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
-              >
-                <option value="Notice">Notice</option>
-                <option value="Agenda">Agenda</option>
-                <option value="Minutes">Minutes</option>
-                <option value="Resolution">Resolution</option>
-                <option value="Attendance Sheet">Attendance Sheet</option>
-                <option value="Supporting Document">Supporting Document</option>
-              </select>
-            </div>
-
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-bold text-slate-300 mb-1">Select File (PDF or Image)</label>
-              <input
-                type="file"
-                required
-                onChange={(e) => setSelectedFile(e.target.files[0])}
-                className="text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-emerald-400"
+          <form onSubmit={handleSaveMinutes} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                1. Meeting Summary & Chairman Opening Address
+              </label>
+              <textarea
+                rows={3}
+                disabled={isFinalized}
+                placeholder="Record opening remarks, presence of board members, and declaration of quorum..."
+                value={minuteForm.summary}
+                onChange={(e) => setMinuteForm(prev => ({ ...prev, summary: e.target.value }))}
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:bg-white focus:border-teal-500 focus:outline-none disabled:bg-slate-100"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={uploading || !selectedFile}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl"
-            >
-              {uploading ? 'Uploading...' : 'Upload Attachment'}
-            </button>
-          </form>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                2. Summary of Deliberations & Key Discussions
+              </label>
+              <textarea
+                rows={4}
+                disabled={isFinalized}
+                placeholder="Detail key matters debated, financial figures presented, and questions raised by members..."
+                value={minuteForm.discussions}
+                onChange={(e) => setMinuteForm(prev => ({ ...prev, discussions: e.target.value }))}
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:bg-white focus:border-teal-500 focus:outline-none disabled:bg-slate-100"
+              />
+            </div>
 
-          {/* Documents Table */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                3. Decisions Taken
+              </label>
+              <textarea
+                rows={3}
+                disabled={isFinalized}
+                placeholder="List agreed conclusions, policy ratifications, and administrative actions..."
+                value={minuteForm.decisions}
+                onChange={(e) => setMinuteForm(prev => ({ ...prev, decisions: e.target.value }))}
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium focus:bg-white focus:border-teal-500 focus:outline-none disabled:bg-slate-100"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider text-teal-800">
+                4. Passed Resolutions (Formal Policy Declarations)
+              </label>
+              <textarea
+                rows={4}
+                disabled={isFinalized}
+                placeholder="Resolution 1: RESOLVED that the audited financial statements for FY 2026 be approved...&#10;Resolution 2: RESOLVED that dividend at 8% on share capital be distributed..."
+                value={minuteForm.resolutions}
+                onChange={(e) => setMinuteForm(prev => ({ ...prev, resolutions: e.target.value }))}
+                className="w-full p-4 rounded-2xl bg-teal-50/40 border border-teal-200 text-slate-900 text-xs font-bold focus:bg-white focus:border-teal-500 focus:outline-none disabled:bg-slate-100 font-mono"
+              />
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 4: ACTION ITEMS */}
+      {activeTab === 'ActionItems' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-teal-600" />
+                <span>Action Items & Directives ({actionItems.length})</span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Tasks and execution follow-ups assigned during assembly.</p>
+            </div>
+          </div>
+
           <div className="space-y-3">
-            {documents.length === 0 ? (
-              <div className="text-xs text-slate-500 py-8 text-center">No documents uploaded for this meeting.</div>
+            {actionItems.length === 0 ? (
+              <p className="text-xs text-slate-400 py-4 text-center">No action items registered.</p>
             ) : (
-              documents.map((doc) => (
-                <div key={doc._id} className="p-3 bg-slate-900/60 border border-slate-700/60 rounded-xl flex justify-between items-center text-xs">
-                  <div>
-                    <div className="font-bold text-white">{doc.fileName}</div>
-                    <div className="text-slate-400 mt-0.5">Category: {doc.documentType} | Uploaded by: {doc.uploadedBy ? `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}` : 'User'}</div>
+              actionItems.map((item, idx) => (
+                <div key={item._id || idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-slate-900">{item.task}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-500 font-medium">
+                      {item.dueDate && <span>Due: {new Date(item.dueDate).toLocaleDateString('en-IN')}</span>}
+                      {item.remarks && <span>• {item.remarks}</span>}
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    item.status === 'Completed' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    {item.status || 'Pending'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add Action Item Form */}
+          <form onSubmit={handleAddAction} className="p-4 rounded-2xl bg-teal-50/50 border border-teal-200 space-y-3">
+            <h4 className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" /> Assign New Action Item
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                placeholder="Task Directive (e.g. File AGM returns with Registrar)"
+                value={newActionTask}
+                onChange={(e) => setNewActionTask(e.target.value)}
+                required
+                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold"
+              />
+              <input
+                type="date"
+                value={newActionDueDate}
+                onChange={(e) => setNewActionDueDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={addingAction || !newActionTask.trim()}
+                className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold disabled:opacity-50"
+              >
+                {addingAction ? 'Saving...' : 'Register Action Item'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 5: DOCUMENTS */}
+      {activeTab === 'Documents' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-teal-600" />
+                <span>Meeting Documents & Records ({documents.length})</span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Notices, signed attendance books, balance sheet presentations, and PDFs.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {documents.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center col-span-2">No documents attached to this meeting yet.</p>
+            ) : (
+              documents.map((doc, idx) => (
+                <div key={doc._id || idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                  <div className="space-y-0.5 truncate">
+                    <p className="text-xs font-bold text-slate-900 truncate">{doc.fileName}</p>
+                    <p className="text-[10px] text-teal-700 font-bold uppercase">{doc.documentType}</p>
                   </div>
                   <a
                     href={doc.fileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg font-bold flex items-center gap-1"
+                    className="p-2 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-xl border border-teal-200 transition-all shrink-0"
+                    title="Download / View"
                   >
-                    <FileDown className="w-4 h-4" /> Download / View
+                    <Download className="w-4 h-4" />
                   </a>
                 </div>
               ))
             )}
           </div>
+
+          {/* Upload Document Box */}
+          <form onSubmit={handleUploadDoc} className="p-4 rounded-2xl bg-teal-50/50 border border-teal-200 space-y-3">
+            <h4 className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5" /> Attach Meeting Document
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                value={docType}
+                onChange={(e) => setDocType(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold"
+              >
+                <option value="Meeting Notice">Meeting Notice</option>
+                <option value="Agenda Booklet">Agenda Booklet</option>
+                <option value="Financial Report / Balance Sheet">Financial Report / Balance Sheet</option>
+                <option value="Signed Attendance Sheet">Signed Attendance Sheet</option>
+                <option value="Adopted Resolutions PDF">Adopted Resolutions PDF</option>
+                <option value="Supporting Document">Supporting Document</option>
+              </select>
+              <input
+                type="file"
+                onChange={(e) => setSelectedFile(e.target.files[0])}
+                className="w-full px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700"
+              />
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={uploading || !selectedFile}
+                className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold disabled:opacity-50"
+              >
+                {uploading ? 'Uploading...' : 'Attach Document'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
+
     </div>
   );
 };

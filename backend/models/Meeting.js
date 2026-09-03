@@ -27,8 +27,11 @@ const meetingSchema = new mongoose.Schema({
   meetingType: {
     type: String,
     enum: [
+      'Annual General Meeting (AGM)',
+      'Special General Meeting (SGM)',
       'General Meeting',
       'Board Meeting',
+      'Executive Committee',
       'Committee Meeting',
       'Branch Meeting',
       'Group Meeting',
@@ -39,6 +42,17 @@ const meetingSchema = new mongoose.Schema({
     ],
     default: 'General Meeting',
     required: true,
+  },
+  audienceTargetType: {
+    type: String,
+    enum: [
+      'AllMembers',
+      'AllExecutives',
+      'EntireBranch',
+      'EntireGroup',
+      'CustomSelection'
+    ],
+    default: 'CustomSelection',
   },
   description: {
     type: String,
@@ -73,7 +87,7 @@ const meetingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Scheduled', 'Ongoing', 'Completed', 'Cancelled', 'Postponed'],
+    enum: ['Scheduled', 'Ongoing', 'Completed', 'Cancelled', 'Postponed', 'Ended'],
     default: 'Scheduled',
   },
   createdBy: {
