@@ -4,8 +4,10 @@ import {
   Download, 
   Printer, 
   CheckCircle2, 
-  Loader2,
-  Building2 
+  Loader2, 
+  Building2,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { fetchMemberReports, fetchOrganizations } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,140 +76,148 @@ const MemberReportsPage = () => {
   const branchGrowthList = data?.branchGrowth || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <FileText className="w-6 h-6 text-emerald-400" />
-            <span>Member Operational Reports & Exports</span>
-          </h1>
-          <p className="text-xs text-slate-400">
-            Generate Active Members, New Members, Suspended Members, and Branch-wise Growth reports with PDF & Excel export options
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {isSuperAdmin && (
-            <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5 text-xs">
-              <Building2 className="w-4 h-4 text-emerald-400" />
-              <span className="text-slate-400 font-semibold">Society:</span>
-              <select
-                value={selectedOrgId}
-                onChange={(e) => setSelectedOrgId(e.target.value)}
-                className="bg-transparent text-emerald-300 font-bold focus:outline-none cursor-pointer"
-              >
-                <option value="All" className="bg-slate-900 text-white">All Organizations</option>
-                {organizations.map((org) => (
-                  <option key={org._id} value={org._id} className="bg-slate-900 text-white">
-                    {org.name} ({org.code || 'ORG'})
-                  </option>
-                ))}
-              </select>
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-soft-teal space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <span>Operational Analytics & Data Export</span>
             </div>
-          )}
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Member Reports & Exports
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Generate Active Members, New Members, Suspended Accounts, and Branch-wise Growth summaries.
+            </p>
+          </div>
 
-          <button
-            onClick={handleExportPDF}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700"
-          >
-            <Printer className="w-4 h-4 text-rose-400" />
-            <span>Export PDF</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {isSuperAdmin && (
+              <div className="flex items-center gap-2 bg-slate-50 border border-teal-200 rounded-xl px-3.5 py-2 shadow-xs">
+                <Building2 className="w-4 h-4 text-teal-600" />
+                <span className="text-xs text-slate-500 font-bold hidden sm:inline">Society:</span>
+                <select
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  className="bg-transparent text-teal-900 text-xs font-bold focus:outline-none cursor-pointer max-w-[180px] truncate"
+                >
+                  <option value="All">All Societies</option>
+                  {organizations.map((org) => (
+                    <option key={org._id} value={org._id}>
+                      {org.name} ({org.code || 'ORG'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          <button
-            onClick={handleExportExcel}
-            className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold flex items-center gap-2 border border-emerald-500/30"
-          >
-            <Download className="w-4 h-4 text-emerald-400" />
-            <span>Export Excel</span>
-          </button>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-2 border border-slate-200 shadow-xs"
+            >
+              <Printer className="w-4 h-4 text-rose-500" />
+              <span>Export PDF</span>
+            </button>
+
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-teal-600/20"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Excel</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {exportMsg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{exportMsg}</span>
+        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
+          <span className="font-semibold">{exportMsg}</span>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap gap-2">
         {['ActiveMembers', 'NewMembers', 'SuspendedMembers', 'BranchGrowth'].map((tab) => (
           <button
             key={tab}
             onClick={() => setReportType(tab)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               reportType === tab
-                ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 shadow-md'
-                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {tab} Report
+            {tab.replace(/([A-Z])/g, ' $1').trim()} Report
           </button>
         ))}
       </div>
 
       {/* Tables */}
       {loading ? (
-        <div className="flex items-center justify-center p-12 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+        <div className="flex items-center justify-center p-16 bg-white rounded-3xl border border-slate-200 shadow-xs">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
         </div>
       ) : (
-        <div className="glass-card rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs">
           
-          {reportType === 'ActiveMembers' && (
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-                <tr>
-                  <th className="px-6 py-4">Membership ID</th>
-                  <th className="px-6 py-4">Member Name</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Branch</th>
-                  <th className="px-6 py-4 text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {activeMembersList.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-900/50">
-                    <td className="px-6 py-4 font-mono font-bold text-emerald-400">{row.memberId}</td>
-                    <td className="px-6 py-4 font-bold text-white">{row.name}</td>
-                    <td className="px-6 py-4">{row.category}</td>
-                    <td className="px-6 py-4">{row.branch}</td>
-                    <td className="px-6 py-4 text-right font-semibold text-emerald-400">{row.status}</td>
+          {reportType !== 'BranchGrowth' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-teal-50/70 text-teal-900 uppercase tracking-wider font-bold border-b border-teal-100 text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">Member ID</th>
+                    <th className="px-6 py-3.5">Full Name</th>
+                    <th className="px-6 py-3.5">Category</th>
+                    <th className="px-6 py-3.5">Branch Location</th>
+                    <th className="px-6 py-3.5">Savings Balance</th>
+                    <th className="px-6 py-3.5 text-right">Loan Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {reportType === 'BranchGrowth' && (
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-                <tr>
-                  <th className="px-6 py-4">Branch Name</th>
-                  <th className="px-6 py-4">Total Member Count</th>
-                  <th className="px-6 py-4 text-right">Active Savings Portfolio</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {branchGrowthList.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-900/50">
-                    <td className="px-6 py-4 font-bold text-white">{row.branchName}</td>
-                    <td className="px-6 py-4 font-mono text-emerald-400 font-bold">{row.memberCount} Members</td>
-                    <td className="px-6 py-4 text-right font-mono text-cyan-400 font-bold">{row.activeSavings}</td>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {activeMembersList.map((m, idx) => (
+                    <tr key={idx} className="hover:bg-teal-50/30 transition-colors">
+                      <td className="px-6 py-4 font-mono font-bold text-teal-800">{m.memberId}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900">{m.name}</td>
+                      <td className="px-6 py-4">{m.accountType}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-700">{m.branchName || 'Main Branch'}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-slate-900">{m.savingsBalance}</td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 border border-teal-200 text-teal-800">
+                          {m.loanStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-teal-50/70 text-teal-900 uppercase tracking-wider font-bold border-b border-teal-100 text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">Branch Name</th>
+                    <th className="px-6 py-3.5">Total Members</th>
+                    <th className="px-6 py-3.5">Active Depositors</th>
+                    <th className="px-6 py-3.5 text-right">Growth Rate</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {(reportType === 'NewMembers' || reportType === 'SuspendedMembers') && (
-            <div className="p-8 text-center text-xs text-slate-400">
-              <FileText className="w-8 h-8 text-emerald-400 mx-auto mb-2 opacity-50" />
-              <span>Report data loaded for {reportType}. Click Export to save report file.</span>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {branchGrowthList.map((bg, idx) => (
+                    <tr key={idx} className="hover:bg-teal-50/30 transition-colors">
+                      <td className="px-6 py-4 font-bold text-slate-900">{bg.branchName}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-teal-800">{bg.totalMembers}</td>
+                      <td className="px-6 py-4 text-slate-700">{bg.activeDepositors}</td>
+                      <td className="px-6 py-4 font-bold text-emerald-700 text-right">{bg.growthRate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

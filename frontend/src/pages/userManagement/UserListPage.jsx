@@ -12,7 +12,8 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Loader2,
-  Building2
+  Building2,
+  X
 } from 'lucide-react';
 import { fetchUsersList, resetUserPasswordApi, toggleUserStatusApi, deleteUserApi, fetchBranchesList, fetchOrganizations } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +21,8 @@ import { useAuth } from '../../contexts/AuthContext';
 const UserListPage = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'Super Admin';
+  const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
+  const userBranchId = user?.branchId?._id || user?.branchId || '';
 
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrgId, setSelectedOrgId] = useState('All');
@@ -29,7 +32,7 @@ const UserListPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
-  const [branchFilter, setBranchFilter] = useState('All');
+  const [branchFilter, setBranchFilter] = useState(isBranchScoped ? userBranchId : 'All');
   const [statusFilter, setStatusFilter] = useState('All');
 
   // Password reset modal
@@ -60,8 +63,13 @@ const UserListPage = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const userParams = { search, role: roleFilter, branchId: branchFilter, status: statusFilter };
+      const effectiveBranch = isBranchScoped ? userBranchId : branchFilter;
+      const userParams = { search, role: roleFilter, branchId: effectiveBranch, status: statusFilter };
       const branchParams = {};
+
+      if (isBranchScoped && userBranchId) {
+        branchParams.branchId = userBranchId;
+      }
 
       if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
         userParams.organizationId = selectedOrgId;
@@ -98,7 +106,7 @@ const UserListPage = () => {
     try {
       const res = await toggleUserStatusApi(u._id);
       if (res.data && res.data.success) {
-        setMsg(`Account status for '${u.name}' updated.`);
+        setMsg(`Status updated for ${u.name}.`);
         loadUsers();
       }
     } catch (err) {
@@ -114,19 +122,16 @@ const UserListPage = () => {
 
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!newPassword || newPassword.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
-      return;
-    }
+    if (!resetModalUser || !newPassword) return;
 
     setResetting(true);
     setErrorMsg('');
-
     try {
       const res = await resetUserPasswordApi(resetModalUser._id, { newPassword });
       if (res.data && res.data.success) {
-        setMsg(`Password reset successfully for '${resetModalUser.name}'.`);
+        setMsg(`Password reset successfully for ${resetModalUser.username}.`);
         setResetModalUser(null);
+        setNewPassword('');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Failed to reset password.');
@@ -136,7 +141,7 @@ const UserListPage = () => {
   };
 
   const handleDelete = async (u) => {
-    if (!window.confirm(`Are you sure you want to remove user account '${u.name}'?`)) return;
+    if (!window.confirm(`Are you sure you want to delete user account '${u.name}' (@${u.username})?`)) return;
     try {
       const res = await deleteUserApi(u._id);
       if (res.data && res.data.success) {
@@ -149,23 +154,23 @@ const UserListPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-cyan-400" />
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Users className="w-6 h-6 text-teal-600" />
             <span>User Directory & Accounts</span>
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Search society members, staff officers, and admins, perform bcrypt password resets, and toggle account statuses
           </p>
         </div>
 
         <Link
           to="/users/create"
-          className="px-4 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+          className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-teal-600/20"
         >
           <UserPlus className="w-4 h-4" />
           <span>Create New User</span>
@@ -173,22 +178,22 @@ const UserListPage = () => {
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
           <span>{msg}</span>
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
         <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, username, email..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
           />
         </form>
 
@@ -196,14 +201,14 @@ const UserListPage = () => {
           {/* Super Admin Organization Filter */}
           {isSuperAdmin && (
             <div className="flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-emerald-400" />
+              <Building2 className="w-4 h-4 text-teal-600" />
               <select
                 value={selectedOrgId}
                 onChange={(e) => {
                   setSelectedOrgId(e.target.value);
                   setBranchFilter('All');
                 }}
-                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-bold focus:outline-none"
+                className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-teal-900 font-bold focus:bg-white focus:outline-none focus:border-teal-600"
               >
                 <option value="All">All Organizations</option>
                 {organizations.map((org) => (
@@ -215,12 +220,12 @@ const UserListPage = () => {
             </div>
           )}
 
-          <Filter className="w-4 h-4 text-slate-500" />
+          <Filter className="w-4 h-4 text-slate-400" />
           
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
           >
             <option value="All">All Roles</option>
             <option value="Organization Admin">Org Admin</option>
@@ -231,21 +236,23 @@ const UserListPage = () => {
             <option value="Member">Member</option>
           </select>
 
-          <select
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
-          >
-            <option value="All">All Branches</option>
-            {branches.map((b) => (
-              <option key={b._id} value={b._id}>{b.branchName}</option>
-            ))}
-          </select>
+          {!isBranchScoped && (
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
+            >
+              <option value="All">All Branches</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>{b.branchName}</option>
+              ))}
+            </select>
+          )}
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
           >
             <option value="All">All Statuses</option>
             <option value="Active">Active</option>
@@ -257,63 +264,71 @@ const UserListPage = () => {
       {/* Users Table */}
       {loading ? (
         <div className="flex items-center justify-center p-12 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+        </div>
+      ) : users.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+          <Users className="w-12 h-12 text-teal-600 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900">No Users Found</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            No active user accounts matched the selected organization or filter criteria.
+          </p>
         </div>
       ) : (
-        <div className="glass-card rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-teal-50/70 text-teal-900 uppercase tracking-wider font-bold border-b border-teal-100 text-[11px]">
                 <tr>
-                  <th className="px-6 py-4">User Name</th>
-                  <th className="px-6 py-4">Role Title</th>
-                  <th className="px-6 py-4">Branch Location</th>
-                  <th className="px-6 py-4">Contact Info</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-3.5">User Name</th>
+                  <th className="px-6 py-3.5">Role Title</th>
+                  <th className="px-6 py-3.5">Branch Location</th>
+                  <th className="px-6 py-3.5">Contact Info</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
+              <tbody className="divide-y divide-slate-100">
                 {users.map((u) => (
-                  <tr key={u._id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-white">
+                  <tr key={u._id} className="hover:bg-teal-50/30 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-900">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 font-mono">
+                        <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0 font-mono font-bold">
                           {u.name ? u.name[0] : 'U'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span>{u.name}</span>
                             {u.organizationId?.code && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[9px]">
+                              <span className="px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 font-mono text-[9px] font-bold">
                                 {u.organizationId.code}
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono font-normal">@{u.username}</div>
+                          <div className="text-[11px] text-slate-400 font-mono font-normal">@{u.username}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-50 border border-teal-200 text-teal-800">
                         {u.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300">
+                    <td className="px-6 py-4 text-slate-700">
                       <div>{u.branchId ? u.branchId.branchName || 'Assigned Branch' : 'Head Office'}</div>
                       {u.organizationId?.name && (
-                        <div className="text-[10px] text-slate-500">{u.organizationId.name}</div>
+                        <div className="text-[10px] text-slate-400">{u.organizationId.name}</div>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div>{u.email}</div>
-                      <div className="text-slate-500 text-[11px]">{u.phone || '+91 99000 00000'}</div>
+                      <div className="font-bold text-slate-900">{u.email}</div>
+                      <div className="text-slate-400 text-[11px]">{u.phone || '+91 99000 00000'}</div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         u.isActive !== false
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          ? 'bg-teal-50 border-teal-200 text-teal-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-700'
                       }`}>
                         {u.isActive !== false ? 'Active' : 'Inactive'}
                       </span>
@@ -322,18 +337,18 @@ const UserListPage = () => {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenResetModal(u)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold flex items-center gap-1"
+                          className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-amber-700 border border-slate-200 font-bold flex items-center gap-1 shadow-xs transition-colors"
                         >
-                          <KeyRound className="w-3.5 h-3.5" />
+                          <KeyRound className="w-3.5 h-3.5 text-amber-600" />
                           <span>Reset Password</span>
                         </button>
 
                         <button
                           onClick={() => handleToggleStatus(u)}
-                          className={`p-1.5 rounded-lg font-semibold flex items-center gap-1 border ${
+                          className={`p-1.5 rounded-xl font-bold flex items-center gap-1 border transition-colors ${
                             u.isActive !== false
-                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                              : 'bg-teal-50 border-teal-200 text-teal-800 hover:bg-teal-100'
                           }`}
                         >
                           <Power className="w-3.5 h-3.5" />
@@ -341,7 +356,7 @@ const UserListPage = () => {
 
                         <button
                           onClick={() => handleDelete(u)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400"
+                          className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-700 border border-slate-200 shadow-xs transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -357,43 +372,45 @@ const UserListPage = () => {
 
       {/* ADMIN PASSWORD RESET MODAL */}
       {resetModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="glass-card max-w-md w-full rounded-3xl border border-slate-700 p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-amber-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white max-w-md w-full rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-600" />
                 <span>Admin Password Reset</span>
               </h3>
-              <button onClick={() => setResetModalUser(null)} className="text-slate-400 hover:text-white">✕</button>
+              <button onClick={() => setResetModalUser(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Set a new secure password for <strong>{resetModalUser.name}</strong> (@{resetModalUser.username}). The password will be hashed using bcrypt.
+            <p className="text-xs text-slate-500">
+              Set a new secure password for <strong className="text-slate-900">{resetModalUser.name}</strong> (@{resetModalUser.username}). The password will be hashed using bcrypt.
             </p>
 
             {errorMsg && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
             <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">New Password *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">New Password *</label>
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   placeholder="Min 6 characters"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600 font-mono font-bold"
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setResetModalUser(null)} className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
-                <button type="submit" disabled={resetting} className="px-5 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs">
+                <button type="button" onClick={() => setResetModalUser(null)} className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700">Cancel</button>
+                <button type="submit" disabled={resetting} className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20">
                   {resetting ? 'Resetting...' : 'Update Password'}
                 </button>
               </div>

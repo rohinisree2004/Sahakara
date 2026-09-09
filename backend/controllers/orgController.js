@@ -1,15 +1,21 @@
 const Organization = require('../models/Organization');
 const Branch = require('../models/Branch');
 const User = require('../models/User');
+const RoleAssignment = require('../models/RoleAssignment');
 const OrganizationSetting = require('../models/OrganizationSetting');
 const AuditLog = require('../models/AuditLog');
 
 // Helper to determine target organization ID based on user context
 const getTargetOrgId = (req) => {
-  if (req.user.role === 'Super Admin' && req.query.organizationId) {
-    return req.query.organizationId;
+  const isSuperAdmin = req.user?.role === 'Super Admin' || req.user?.activeRole === 'Super Admin';
+  const queryOrg = req.query?.organizationId || req.body?.organizationId;
+  if (queryOrg && queryOrg !== 'All' && queryOrg !== 'undefined' && queryOrg !== 'null') {
+    return queryOrg;
   }
-  return req.user.organizationId || '65e111111111111111111111';
+  if (isSuperAdmin) {
+    return null; // Global Super Admin scope
+  }
+  return req.user?.organizationId || req.user?.contextOrgId || null;
 };
 
 // Helper to log organization audit events
@@ -43,12 +49,13 @@ exports.getOrgDashboard = async (req, res, next) => {
 
     const targetId = org ? org._id : orgId;
     const branchCount = await Branch.countDocuments({ organizationId: targetId, isDeleted: false });
-    const employeeCount = await User.countDocuments({ organizationId: targetId, role: { $in: ['Employee', 'President', 'Secretary', 'Treasurer'] } });
+    const employeeCount = await User.countDocuments({ organizationId: targetId, role: { $in: ['Employee', 'President', 'Secretary', 'Treasurer', 'Branch Manager', 'Organization Admin'] } });
     const memberCount = await Member.countDocuments({ organizationId: targetId });
     const groupCount = await Group.countDocuments({ organizationId: targetId, isDeleted: false });
 
     const SavingsAccount = require('../models/SavingsAccount');
     const Loan = require('../models/Loan');
+    const Meeting = require('../models/Meeting');
 
     const savingsAggr = await SavingsAccount.aggregate([
       { $match: { organizationId: targetId } },
@@ -59,6 +66,15 @@ exports.getOrgDashboard = async (req, res, next) => {
       { $group: { _id: null, total: { $sum: "$approvedAmount" }, count: { $sum: 1 } } }
     ]);
 
+    const pendingLoans = await Loan.countDocuments({ organizationId: targetId, status: { $in: ['Applied', 'Under Review'] } });
+    const pendingMembers = await Member.countDocuments({ organizationId: targetId, status: 'Pending' });
+    const totalMeetings = await Meeting.countDocuments({ organizationId: targetId });
+
+    const branchesList = await Branch.find({ organizationId: targetId, isDeleted: false })
+      .populate('managerId', 'name email phone')
+      .limit(6)
+      .lean();
+
     const totalSavings = savingsAggr.length > 0 ? savingsAggr[0].total : 0;
     const totalLoans = loansAggr.length > 0 ? loansAggr[0].total : 0;
     const activeLoanAccounts = loansAggr.length > 0 ? loansAggr[0].count : 0;
@@ -66,18 +82,24 @@ exports.getOrgDashboard = async (req, res, next) => {
     const summary = {
       organizationName: org ? org.name : 'Unknown Organization',
       code: org ? org.code : 'UNKNOWN',
+      registrationNumber: org?.registrationNumber || 'REG-KL-2024-001',
       societyType: org ? org.societyType : 'Credit Cooperative',
       totalBranches: branchCount,
       totalEmployees: employeeCount,
       totalMembers: memberCount,
       totalGroups: groupCount,
+      totalMeetings: totalMeetings,
+      pendingLoansCount: pendingLoans,
+      pendingMembersKYC: pendingMembers,
+      totalPendingApprovals: pendingLoans + pendingMembers,
       activeLoansAmount: `₹ ${totalLoans.toLocaleString()}`,
       monthlySavingsManaged: `₹ ${totalSavings.toLocaleString()}`,
       activeLoanAccounts: activeLoanAccounts,
       savingsAccountsCount: memberCount,
+      branches: branchesList,
     };
 
-    const recentLogs = await AuditLog.find({ organizationId: targetId }).sort({ createdAt: -1 }).limit(5);
+    const recentLogs = await AuditLog.find({ organizationId: targetId }).sort({ createdAt: -1 }).limit(6);
 
     return res.status(200).json({
       success: true,
@@ -357,22 +379,53 @@ exports.updateOrgSettings = async (req, res, next) => {
 // @access  Private
 exports.getOrgEmployees = async (req, res, next) => {
   try {
-    const orgId = getTargetOrgId(req);
-    const { search, role } = req.query;
+    const rawOrgId = getTargetOrgId(req);
+    const orgId = rawOrgId && rawOrgId !== 'All' && rawOrgId !== 'undefined' ? rawOrgId : null;
+    const { search, role, branchId } = req.query;
 
-    let query = { organizationId: orgId };
+    const staffRoles = ['Employee', 'Branch Manager', 'Organization Admin'];
+
+    const asgnFilter = { isDeleted: false };
+    if (orgId) asgnFilter.organizationId = orgId;
+    if (branchId && branchId !== 'All') asgnFilter.branchId = branchId;
     if (role && role !== 'All') {
-      query.role = role;
-    }
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } },
-      ];
+      asgnFilter.role = role;
+    } else {
+      asgnFilter.role = { $in: staffRoles };
     }
 
-    const employees = await User.find(query).select('-password').sort({ createdAt: -1 });
+    const assignments = await RoleAssignment.find(asgnFilter)
+      .populate('userId', '-password')
+      .populate('organizationId', 'name code')
+      .populate('branchId', 'branchName branchCode');
+
+    let employees = [];
+    const seenUserIds = new Set();
+
+    for (const a of assignments) {
+      if (!a.userId || a.userId.isDeleted) continue;
+      const uid = a.userId._id.toString();
+      if (!seenUserIds.has(uid)) {
+        seenUserIds.add(uid);
+        const u = a.userId.toObject ? a.userId.toObject() : a.userId;
+        u.role = a.role;
+        u.roleAssignmentId = a._id;
+        u.organizationId = a.organizationId;
+        u.branchId = a.branchId;
+        u.assignmentStatus = a.status;
+        employees.push(u);
+      }
+    }
+
+    if (search) {
+      const term = search.toLowerCase();
+      employees = employees.filter(e => 
+        (e.name || '').toLowerCase().includes(term) ||
+        (e.username || '').toLowerCase().includes(term) ||
+        (e.email || '').toLowerCase().includes(term) ||
+        (e.phone || '').toLowerCase().includes(term)
+      );
+    }
 
     return res.status(200).json({
       success: true,

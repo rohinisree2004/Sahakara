@@ -1,96 +1,145 @@
 const mongoose = require('mongoose');
 const { orgIds } = require('./organizations');
 const { branchIds } = require('./branches');
-const { memberIds } = require('./members');
+const { members } = require('./members');
+const { groups } = require('./groups');
 const { userIds } = require('./users');
 
 const savingsAccounts = [];
 const savingsTransactions = [];
 
-const createSavingsData = (orgId, branchId, prefix, count, createdBy) => {
-  for (let i = 1; i <= count; i++) {
-    const memberIdKey = `${prefix}${i}`;
-    const accountId = new mongoose.Types.ObjectId();
-    const openingBalance = 500;
-    const additionalDeposits = [1000, 1500];
+const groupMap = {};
+for (const g of groups) {
+  groupMap[g._id.toString()] = g;
+}
 
-    // Savings Account
+// Generate dedicated group savings account and passbook ledger for every member for every group they belong to!
+let accCounter = 1000;
+let txnCounter = 5000;
+
+for (const member of members) {
+  const gList = member.groupIds && member.groupIds.length > 0 
+    ? member.groupIds 
+    : (member.groupId ? [member.groupId] : []);
+
+  for (let gIdx = 0; gIdx < gList.length; gIdx++) {
+    const gid = gList[gIdx];
+    const groupDoc = groupMap[gid.toString()];
+    if (!groupDoc) continue;
+
+    accCounter++;
+    const accountId = new mongoose.Types.ObjectId();
+    const grpCode = groupDoc.groupCode || `GRP${gIdx + 1}`;
+    const memCode = member.memberId || `MEM${member._id.toString().slice(-4)}`;
+    const accountNumber = `SAV-${grpCode}-${memCode}`;
+
+    // Stagger balances between 12,000 and 28,000 for realistic data
+    const baseOpen = 5000 + ((member._id.toString().charCodeAt(member._id.toString().length - 1) % 4) * 1000);
+    const deposit1 = 3000 + (gIdx * 500);
+    const deposit2 = 4500;
+    const deposit3 = 2500;
+    const totalBal = baseOpen + deposit1 + deposit2 + deposit3;
+
     savingsAccounts.push({
       _id: accountId,
-      organizationId: orgId,
-      branchId: branchId,
-      memberId: memberIds[memberIdKey],
-      accountNumber: `SA-${prefix}-${1000 + i}`,
+      organizationId: member.organizationId || groupDoc.organizationId,
+      branchId: groupDoc.branchId || member.branchId,
+      memberId: member._id,
+      groupId: groupDoc._id,
+      accountNumber: accountNumber,
       accountType: 'Regular Savings',
-      openingBalance: openingBalance,
-      currentBalance: openingBalance + additionalDeposits[0] + additionalDeposits[1],
-      minimumBalance: 100,
+      openingBalance: baseOpen,
+      currentBalance: totalBal,
+      minimumBalance: 500,
       interestRate: 4.5,
       status: 'Active',
-      openedAt: new Date(2025, 1, 15),
-      lastTransactionDate: new Date(),
-      createdBy: createdBy,
+      openedAt: new Date(2025, 0, 15),
+      lastTransactionDate: new Date(2025, 3, 20),
+      createdBy: member.createdBy || userIds.kuAdmin,
     });
 
-    // Opening Deposit Transaction
+    // 1. Opening Deposit Transaction
+    txnCounter++;
     savingsTransactions.push({
       _id: new mongoose.Types.ObjectId(),
-      organizationId: orgId,
-      branchId: branchId,
+      organizationId: member.organizationId || groupDoc.organizationId,
+      branchId: groupDoc.branchId || member.branchId,
       savingsAccountId: accountId,
-      memberId: memberIds[memberIdKey],
-      transactionId: `TRX-${prefix}-${2000 + (i * 3)}`,
+      memberId: member._id,
+      groupId: groupDoc._id,
+      transactionId: `TRX-${grpCode}-${txnCounter}`,
       transactionType: 'Deposit',
-      amount: openingBalance,
+      amount: baseOpen,
       paymentMethod: 'Cash',
-      balanceAfterTransaction: openingBalance,
+      balanceAfterTransaction: baseOpen,
+      transactionDate: new Date(2025, 0, 15),
+      status: 'Completed',
+      createdBy: member.createdBy || userIds.kuAdmin,
+      remarks: `Opening savings deposit for ${groupDoc.groupName}`
+    });
+
+    // 2. Monthly Thrift Contribution 1
+    txnCounter++;
+    savingsTransactions.push({
+      _id: new mongoose.Types.ObjectId(),
+      organizationId: member.organizationId || groupDoc.organizationId,
+      branchId: groupDoc.branchId || member.branchId,
+      savingsAccountId: accountId,
+      memberId: member._id,
+      groupId: groupDoc._id,
+      transactionId: `TRX-${grpCode}-${txnCounter}`,
+      transactionType: 'Deposit',
+      amount: deposit1,
+      paymentMethod: 'UPI',
+      referenceNumber: `UPI${txnCounter}948`,
+      balanceAfterTransaction: baseOpen + deposit1,
       transactionDate: new Date(2025, 1, 15),
       status: 'Completed',
-      createdBy: createdBy,
-      remarks: 'Opening Balance Deposit'
+      createdBy: member.createdBy || userIds.kuAdmin,
+      remarks: `Monthly thrift installment - Feb 2025 (${groupDoc.groupName})`
     });
 
-    // Transaction 1
+    // 3. Monthly Thrift Contribution 2
+    txnCounter++;
     savingsTransactions.push({
       _id: new mongoose.Types.ObjectId(),
-      organizationId: orgId,
-      branchId: branchId,
+      organizationId: member.organizationId || groupDoc.organizationId,
+      branchId: groupDoc.branchId || member.branchId,
       savingsAccountId: accountId,
-      memberId: memberIds[memberIdKey],
-      transactionId: `TRX-${prefix}-${2001 + (i * 3)}`,
+      memberId: member._id,
+      groupId: groupDoc._id,
+      transactionId: `TRX-${grpCode}-${txnCounter}`,
       transactionType: 'Deposit',
-      amount: additionalDeposits[0],
+      amount: deposit2,
       paymentMethod: 'Cash',
-      balanceAfterTransaction: openingBalance + additionalDeposits[0],
-      transactionDate: new Date(2025, 2, 10),
+      balanceAfterTransaction: baseOpen + deposit1 + deposit2,
+      transactionDate: new Date(2025, 2, 15),
       status: 'Completed',
-      createdBy: createdBy,
-      remarks: 'Monthly Deposit'
+      createdBy: member.createdBy || userIds.kuAdmin,
+      remarks: `Monthly thrift installment - Mar 2025 (${groupDoc.groupName})`
     });
 
-    // Transaction 2
+    // 4. Special Group Deposit 3
+    txnCounter++;
     savingsTransactions.push({
       _id: new mongoose.Types.ObjectId(),
-      organizationId: orgId,
-      branchId: branchId,
+      organizationId: member.organizationId || groupDoc.organizationId,
+      branchId: groupDoc.branchId || member.branchId,
       savingsAccountId: accountId,
-      memberId: memberIds[memberIdKey],
-      transactionId: `TRX-${prefix}-${2002 + (i * 3)}`,
+      memberId: member._id,
+      groupId: groupDoc._id,
+      transactionId: `TRX-${grpCode}-${txnCounter}`,
       transactionType: 'Deposit',
-      amount: additionalDeposits[1],
+      amount: deposit3,
       paymentMethod: 'Bank Transfer',
-      balanceAfterTransaction: openingBalance + additionalDeposits[0] + additionalDeposits[1],
-      transactionDate: new Date(2025, 3, 10),
+      referenceNumber: `NEFT${txnCounter}331`,
+      balanceAfterTransaction: totalBal,
+      transactionDate: new Date(2025, 3, 20),
       status: 'Completed',
-      createdBy: createdBy,
-      remarks: 'Monthly Deposit'
+      createdBy: member.createdBy || userIds.kuAdmin,
+      remarks: `Seasonal thrift deposit (${groupDoc.groupName})`
     });
   }
-};
-
-createSavingsData(orgIds.keralaUnity, branchIds.kottayamMain, 'KU', 6, userIds.kuAdmin);
-createSavingsData(orgIds.sahodaya, branchIds.ernakulamMain, 'SA', 6, userIds.saAdmin);
-createSavingsData(orgIds.greenValley, branchIds.palakkadMain, 'GV', 6, userIds.gvAdmin);
-createSavingsData(orgIds.malabarWelfare, branchIds.kozhikodeMain, 'MW', 6, userIds.mwAdmin);
+}
 
 module.exports = { savingsAccounts, savingsTransactions };

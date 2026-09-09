@@ -55,4 +55,6 @@ Report.zip
 *.pdf
 *.docx
 
-
+# AI Agent & Scratch Directories
+brain/
+.agents/

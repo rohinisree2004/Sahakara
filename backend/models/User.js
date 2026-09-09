@@ -34,31 +34,7 @@ const UserSchema = new mongoose.Schema(
       minlength: [6, 'Password must be at least 6 characters'],
       select: false,
     },
-    role: {
-      type: String,
-      enum: [
-        'Super Admin',
-        'Organization Admin',
-        'President',
-        'Secretary',
-        'Treasurer',
-        'Employee',
-        'Member',
-      ],
-      required: [true, 'Please specify user role'],
-    },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: function () {
-        return this.role !== 'Super Admin';
-      },
-      index: true,
-    },
-    branchId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Branch',
-    },
+    // Note: role, organizationId, and branchId are now managed via RoleAssignment model
     phone: {
       type: String,
       trim: true,
@@ -127,8 +103,6 @@ UserSchema.methods.getSignedJwtToken = function () {
   return jwt.sign(
     {
       id: this._id,
-      role: this.role,
-      organizationId: this.organizationId || null,
       username: this.username,
       name: this.name,
     },

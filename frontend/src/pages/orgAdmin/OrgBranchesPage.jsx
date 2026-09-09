@@ -11,7 +11,10 @@ import {
   MapPin, 
   Phone, 
   Mail, 
-  User 
+  User,
+  ShieldCheck,
+  GitBranch,
+  X
 } from 'lucide-react';
 import { fetchOrgBranches, createOrgBranch, updateOrgBranch, deleteOrgBranch } from '../../services/api';
 
@@ -64,7 +67,7 @@ const OrgBranchesPage = () => {
       email: '',
       address: '',
       city: '',
-      state: '',
+      state: 'Kerala',
     });
     setShowModal(true);
   };
@@ -79,7 +82,7 @@ const OrgBranchesPage = () => {
       email: branch.email || '',
       address: branch.address || '',
       city: branch.city || '',
-      state: branch.state || '',
+      state: branch.state || 'Kerala',
     });
     setShowModal(true);
   };
@@ -138,113 +141,125 @@ const OrgBranchesPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Globe className="w-6 h-6 text-emerald-400" />
-            <span>Branch Management</span>
-          </h1>
-          <p className="text-xs text-slate-400">
-            Create society operational branches, assign branch managers, manage contact info and operational status
-          </p>
-        </div>
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-teal-800 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Network Operations
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+              <span>Society Branch Management</span>
+            </h1>
+            <p className="text-slate-500 text-sm font-medium">
+              Create society operational branch offices, assign branch managers, manage contact details, and audit local operational status.
+            </p>
+          </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Add New Branch</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-teal-600/20 cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Add New Branch</span>
+          </button>
+        </div>
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-sm font-bold flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
           <span>{msg}</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold flex items-center gap-3 shadow-xs">
+          <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+          <span>{errorMsg}</span>
         </div>
       )}
 
       {/* Branches Grid */}
       {loading ? (
-        <div className="flex items-center justify-center p-12 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+        <div className="bg-white p-12 rounded-3xl border border-teal-100/80 text-center space-y-3 shadow-xs">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto" />
+          <p className="text-xs font-bold text-slate-600">Loading society branches...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {branches.map((b) => (
-            <div key={b._id} className="glass-card p-6 rounded-3xl border border-slate-800 space-y-4 hover:border-emerald-500/30 transition-colors flex flex-col justify-between">
+            <div key={b._id} className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4 hover:border-teal-300 transition-all flex flex-col justify-between">
               
               <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-white">{b.branchName}</h3>
-                      <span className="text-[11px] font-mono text-emerald-400 font-bold">Code: {b.branchCode}</span>
-                    </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 shrink-0">
+                    <GitBranch className="w-5 h-5" />
                   </div>
-
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                    b.status === 'Active'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                    b.status === 'Active' 
+                      ? 'bg-teal-50 border border-teal-200 text-teal-800' 
+                      : 'bg-slate-100 border border-slate-200 text-slate-600'
                   }`}>
-                    {b.status}
+                    {b.status || 'Active'}
                   </span>
                 </div>
 
-                <div className="space-y-2 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{b.branchName}</h3>
+                  <p className="text-xs font-mono text-teal-700 font-bold">Code: {b.branchCode || 'BR-01'}</p>
+                </div>
+
+                <div className="space-y-1.5 pt-1 text-xs text-slate-600 font-medium">
                   <div className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>Manager: <strong>{b.managerName || 'Unassigned'}</strong></span>
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Manager: {b.managerName || b.managerId?.name || 'Unassigned'}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>{b.phone || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>{b.email || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                    <span>{b.address ? `${b.address}, ${b.city}` : 'Address not specified'}</span>
-                  </div>
+                  {b.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{b.phone}</span>
+                    </div>
+                  )}
+                  {b.city && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{b.city}, {b.state || 'Kerala'}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                 <button
-                  onClick={() => handleToggleStatus(b)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
-                    b.status === 'Active'
-                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
-                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                  }`}
+                  type="button"
+                  onClick={() => handleOpenEditModal(b)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Power className="w-3.5 h-3.5" />
-                  <span>{b.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handleOpenEditModal(b)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    type="button"
+                    onClick={() => handleToggleStatus(b)}
+                    className="p-2 rounded-xl bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-700 border border-slate-200 transition-colors cursor-pointer"
+                    title="Toggle Status"
                   >
-                    <Edit3 className="w-4 h-4" />
+                    <Power className="w-3.5 h-3.5" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDelete(b)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400"
+                    className="p-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 transition-colors cursor-pointer"
+                    title="Delete Branch"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -254,94 +269,116 @@ const OrgBranchesPage = () => {
         </div>
       )}
 
-      {/* CREATE / EDIT MODAL */}
+      {/* Add / Edit Branch Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="glass-card max-w-lg w-full rounded-3xl border border-slate-700 p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">
-                {editingBranch ? 'Edit Branch Details' : 'Create New Branch'}
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-teal-100/80 shadow-2xl max-w-lg w-full p-6 sm:p-8 space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-teal-600" />
+                <span>{editingBranch ? 'Edit Branch Office' : 'Add New Branch Office'}</span>
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Name *</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Branch Name <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
+                    required
                     value={formData.branchName}
                     onChange={(e) => setFormData({ ...formData, branchName: e.target.value })}
-                    required
-                    placeholder="e.g. Central Branch"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Code *</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Branch Code <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
+                    required
                     value={formData.branchCode}
                     onChange={(e) => setFormData({ ...formData, branchCode: e.target.value })}
-                    required
-                    placeholder="e.g. JP-01"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500 uppercase"
+                    placeholder="e.g. BR-KTM-01"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500 font-mono"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Manager Name</label>
-                  <input
-                    type="text"
-                    value={formData.managerName}
-                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                    placeholder="e.g. Mahesh Rao"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Phone</label>
                   <input
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="branch@coop.org"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Branch Address</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Address</label>
                 <input
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Street / Area Address"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl bg-emerald-400 text-slate-950 font-bold text-xs">
-                  {saving ? 'Saving...' : editingBranch ? 'Update Branch' : 'Save Branch'}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">City / District</label>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">State</label>
+                  <input
+                    type="text"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                  <span>{editingBranch ? 'Save Changes' : 'Create Branch'}</span>
                 </button>
               </div>
             </form>

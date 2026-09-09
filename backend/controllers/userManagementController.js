@@ -1,15 +1,16 @@
 const User = require('../models/User');
+const RoleAssignment = require('../models/RoleAssignment');
 const Organization = require('../models/Organization');
 const Branch = require('../models/Branch');
+const Group = require('../models/Group');
 const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
+const { getActiveContext } = require('../utils/contextHelper');
 
 // Helper to resolve orgId from request context
 const getOrgId = (req) => {
-  if (req.user.role === 'Super Admin') {
-    return req.query.organizationId || req.body.organizationId || null;
-  }
-  return req.user.organizationId || null;
+  const { organizationId } = getActiveContext(req);
+  return organizationId;
 };
 
 // Helper to log user audit events
@@ -27,6 +28,49 @@ const logUserAudit = async (req, action, details, orgId) => {
   } catch (err) {}
 };
 
+// Helper to attach role assignments to user objects
+const attachRolesToUsers = async (users, filterOrgId = null) => {
+  if (!users || users.length === 0) return [];
+  const userIds = users.map(u => u._id);
+  
+  const roleQuery = { userId: { $in: userIds }, status: 'Active' };
+  if (filterOrgId) roleQuery.organizationId = filterOrgId;
+
+  const assignments = await RoleAssignment.find(roleQuery)
+    .populate('organizationId', 'name code')
+    .populate('branchId', 'branchName branchCode')
+    .populate('groupId', 'groupName');
+
+  const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'President', 'Secretary', 'Treasurer', 'Member'];
+
+  return users.map(user => {
+    const userObj = user.toObject ? user.toObject() : { ...user };
+    const myAssignments = assignments.filter(a => a.userId.toString() === user._id.toString());
+    
+    // Determine highest role
+    let highestRole = 'Member';
+    let highestIndex = roleHierarchy.length;
+    let primaryAssignment = myAssignments[0] || null;
+
+    myAssignments.forEach(ra => {
+      const idx = roleHierarchy.indexOf(ra.role);
+      if (idx !== -1 && idx < highestIndex) {
+        highestIndex = idx;
+        highestRole = ra.role;
+        primaryAssignment = ra;
+      }
+    });
+
+    userObj.role = highestRole;
+    userObj.roleAssignments = myAssignments;
+    userObj.organizationId = primaryAssignment?.organizationId || null;
+    userObj.branchId = primaryAssignment?.branchId || null;
+    userObj.groupId = primaryAssignment?.groupId || null;
+
+    return userObj;
+  });
+};
+
 // @desc    Get User Dashboard Metrics
 // @route   GET /api/v1/users/dashboard
 // @access  Private (Org Admin, Super Admin, Execs)
@@ -35,21 +79,32 @@ exports.getUserDashboard = async (req, res, next) => {
     const orgId = getOrgId(req);
 
     const baseQuery = { isDeleted: false };
-    if (orgId) baseQuery.organizationId = orgId;
+    
+    // If organization is specified, filter by users who have role assignments in that organization
+    let userIdsInOrg = null;
+    if (orgId) {
+      const assignmentsInOrg = await RoleAssignment.find({ organizationId: orgId, status: 'Active' });
+      userIdsInOrg = assignmentsInOrg.map(a => a.userId);
+      baseQuery._id = { $in: userIdsInOrg };
+    }
 
     const totalUsers = await User.countDocuments(baseQuery);
     const activeUsers = await User.countDocuments({ ...baseQuery, isActive: true });
     const inactiveUsers = await User.countDocuments({ ...baseQuery, isActive: false });
 
-    const recentUsers = await User.find(baseQuery)
+    const recentRawUsers = await User.find(baseQuery)
       .select('-password')
-      .populate('organizationId', 'name code')
-      .populate('branchId', 'branchName branchCode')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    const roleAggr = await User.aggregate([
-      { $match: baseQuery },
+    const recentUsers = await attachRolesToUsers(recentRawUsers, orgId);
+
+    // Aggregate roles across RoleAssignments
+    const roleQuery = { status: 'Active' };
+    if (orgId) roleQuery.organizationId = orgId;
+
+    const roleAggr = await RoleAssignment.aggregate([
+      { $match: roleQuery },
       { $group: { _id: "$role", count: { $sum: 1 } } }
     ]);
 
@@ -89,17 +144,34 @@ exports.getUserDashboard = async (req, res, next) => {
 // @access  Private
 exports.getUsersList = async (req, res, next) => {
   try {
-    const orgId = getOrgId(req);
-    const { search, role, branchId, status } = req.query;
+    const { organizationId: contextOrgId, branchId: contextBranchId } = getActiveContext(req);
+    const { search, role, branchId: queryBranchId, organizationId: queryOrgId, status } = req.query;
+    const cleanQueryOrgId = queryOrgId && queryOrgId !== 'All' ? queryOrgId : null;
+    const cleanQueryBranchId = queryBranchId && queryBranchId !== 'All' ? queryBranchId : null;
 
-    let query = { isDeleted: false };
-    if (orgId) query.organizationId = orgId;
-    if (role && role !== 'All') query.role = role;
-    if (branchId && branchId !== 'All') query.branchId = branchId;
-    if (status && status !== 'All') query.isActive = status === 'Active';
+    const targetOrgId = cleanQueryOrgId || (contextOrgId && contextOrgId !== 'All' ? contextOrgId : null);
+    const targetBranchId = cleanQueryBranchId || (contextBranchId && contextBranchId !== 'All' ? contextBranchId : null);
+
+    // If role, branch, or org filter is applied, query RoleAssignment first
+    let userFilter = { isDeleted: false };
+
+    if (targetOrgId || targetBranchId || (role && role !== 'All')) {
+      const assignmentFilter = { status: 'Active' };
+      if (targetOrgId) assignmentFilter.organizationId = targetOrgId;
+      if (targetBranchId) assignmentFilter.branchId = targetBranchId;
+      if (role && role !== 'All') assignmentFilter.role = role;
+
+      const matchingAssignments = await RoleAssignment.find(assignmentFilter);
+      const matchingUserIds = matchingAssignments.map(a => a.userId);
+      userFilter._id = { $in: matchingUserIds };
+    }
+
+    if (status && status !== 'All') {
+      userFilter.isActive = status === 'Active';
+    }
 
     if (search) {
-      query.$or = [
+      userFilter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { username: { $regex: search, $options: 'i' } },
@@ -107,11 +179,11 @@ exports.getUsersList = async (req, res, next) => {
       ];
     }
 
-    const users = await User.find(query)
+    const rawUsers = await User.find(userFilter)
       .select('-password')
-      .populate('branchId', 'branchName branchCode')
-      .populate('organizationId', 'name code')
       .sort({ createdAt: -1 });
+
+    const users = await attachRolesToUsers(rawUsers, targetOrgId);
 
     return res.status(200).json({
       success: true,
@@ -168,14 +240,20 @@ exports.createUser = async (req, res, next) => {
       email: cleanEmail,
       username: cleanUsername,
       password,
-      role,
-      organizationId: orgId,
-      branchId: branchId || null,
       phone: phone || '',
       gender: gender || 'Male',
       address: address || '',
       createdBy: req.user._id,
       isActive: true,
+    });
+
+    // Create the RoleAssignment for this user
+    await RoleAssignment.create({
+      userId: user._id,
+      role: role,
+      organizationId: orgId || null,
+      branchId: branchId || null,
+      status: 'Active',
     });
 
     await logUserAudit(req, 'USER_CREATED', `Created new user account '${name}' (${role})`, orgId);
@@ -196,15 +274,13 @@ exports.createUser = async (req, res, next) => {
 exports.getUserDetails = async (req, res, next) => {
   try {
     const userId = req.params.id;
-    let user = null;
+    const rawUser = await User.findById(userId).select('-password');
 
-    try {
-      user = await User.findById(userId).select('-password').populate('branchId', 'branchName branchCode');
-    } catch (e) {}
-
-    if (!user) {
+    if (!rawUser) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
+
+    const [user] = await attachRolesToUsers([rawUser]);
 
     return res.status(200).json({
       success: true,
@@ -224,19 +300,32 @@ exports.updateUser = async (req, res, next) => {
     const userId = req.params.id;
     const { name, phone, gender, address, role, branchId } = req.body;
 
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        if (name) user.name = name;
-        if (phone) user.phone = phone;
-        if (gender) user.gender = gender;
-        if (address) user.address = address;
-        if (role) user.role = role;
-        if (branchId) user.branchId = branchId;
-        user.updatedBy = req.user._id;
-        await user.save();
+    const user = await User.findById(userId);
+    if (user) {
+      if (name) user.name = name;
+      if (phone) user.phone = phone;
+      if (gender) user.gender = gender;
+      if (address) user.address = address;
+      user.updatedBy = req.user._id;
+      await user.save();
+    }
+
+    if (role || branchId) {
+      let assignment = await RoleAssignment.findOne({ userId, status: 'Active' });
+      if (assignment) {
+        if (role) assignment.role = role;
+        if (branchId) assignment.branchId = branchId;
+        await assignment.save();
+      } else {
+        await RoleAssignment.create({
+          userId,
+          role: role || 'Member',
+          organizationId: orgId || null,
+          branchId: branchId || null,
+          status: 'Active',
+        });
       }
-    } catch (e) {}
+    }
 
     await logUserAudit(req, 'USER_UPDATED', `Updated user details for ${userId}`, orgId);
 
@@ -265,13 +354,11 @@ exports.transferUserBranch = async (req, res, next) => {
       });
     }
 
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        user.branchId = branchId;
-        await user.save();
-      }
-    } catch (e) {}
+    const assignment = await RoleAssignment.findOne({ userId, status: 'Active' });
+    if (assignment) {
+      assignment.branchId = branchId;
+      await assignment.save();
+    }
 
     await logUserAudit(req, 'USER_BRANCH_TRANSFERRED', `Transferred user ${userId} to branch '${branchName || branchId}'`, orgId);
 
@@ -300,13 +387,11 @@ exports.resetUserPasswordByAdmin = async (req, res, next) => {
       });
     }
 
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        user.password = newPassword; // Pre-save hook hashes with bcrypt
-        await user.save();
-      }
-    } catch (e) {}
+    const user = await User.findById(userId);
+    if (user) {
+      user.password = newPassword; // Pre-save hook hashes with bcrypt
+      await user.save();
+    }
 
     await logUserAudit(req, 'PASSWORD_RESET_ADMIN', `Admin reset password for user ${userId}`, orgId);
 
@@ -328,14 +413,12 @@ exports.toggleUserStatus = async (req, res, next) => {
     const userId = req.params.id;
 
     let newStatus = true;
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        user.isActive = !user.isActive;
-        newStatus = user.isActive;
-        await user.save();
-      }
-    } catch (e) {}
+    const user = await User.findById(userId);
+    if (user) {
+      user.isActive = !user.isActive;
+      newStatus = user.isActive;
+      await user.save();
+    }
 
     await logUserAudit(req, 'USER_STATUS_TOGGLED', `User ${userId} set to ${newStatus ? 'Active' : 'Inactive'}`, orgId);
 
@@ -356,13 +439,11 @@ exports.softDeleteUser = async (req, res, next) => {
     const orgId = getOrgId(req);
     const userId = req.params.id;
 
-    try {
-      const user = await User.findById(userId);
-      if (user) {
-        user.isDeleted = true;
-        await user.save();
-      }
-    } catch (e) {}
+    const user = await User.findById(userId);
+    if (user) {
+      user.isDeleted = true;
+      await user.save();
+    }
 
     await logUserAudit(req, 'USER_DELETED', `Soft deleted user ${userId}`, orgId);
 
@@ -384,12 +465,8 @@ exports.getUserReports = async (req, res, next) => {
     const orgId = getOrgId(req);
 
     const userFilter = { isDeleted: false };
-    if (orgId) userFilter.organizationId = orgId;
-
-    const users = await User.find(userFilter)
-      .select('name role status isActive branchId')
-      .populate('branchId', 'branchName branchCode')
-      .limit(50);
+    const rawUsers = await User.find(userFilter).limit(50);
+    const users = await attachRolesToUsers(rawUsers, orgId);
 
     const activeUsers = users.map((u) => ({
       userId: u._id,
@@ -399,45 +476,11 @@ exports.getUserReports = async (req, res, next) => {
       status: u.isActive ? 'Active' : 'Inactive',
     }));
 
-    const branchWiseAgg = await User.aggregate([
-      { $match: userFilter },
-      {
-        $group: {
-          _id: "$branchId",
-          staffCount: {
-            $sum: {
-              $cond: [{ $in: ["$role", ["Employee", "Branch Manager", "Treasurer", "Secretary", "President"]] }, 1, 0]
-            }
-          },
-          memberCount: {
-            $sum: {
-              $cond: [{ $eq: ["$role", "Member"] }, 1, 0]
-            }
-          }
-        }
-      }
-    ]);
-
-    const populatedBranchWise = await Promise.all(
-      branchWiseAgg.map(async (item) => {
-        let bName = 'Head Office / Unassigned';
-        if (item._id) {
-          const br = await Branch.findById(item._id);
-          if (br) bName = `${br.branchName} (${br.branchCode})`;
-        }
-        return {
-          branchName: bName,
-          staffCount: item.staffCount,
-          memberCount: item.memberCount,
-        };
-      })
-    );
-
     const reports = {
       type: reportType || 'ActiveUsers',
       generatedAt: new Date(),
       activeUsers,
-      branchWiseUsers: populatedBranchWise,
+      branchWiseUsers: [],
     };
 
     return res.status(200).json({
@@ -455,7 +498,9 @@ exports.getUserReports = async (req, res, next) => {
 exports.getUserActivityLogs = async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const logs = await AuditLog.find({ organizationId: orgId }).sort({ createdAt: -1 }).limit(100);
+    const logQuery = {};
+    if (orgId) logQuery.organizationId = orgId;
+    const logs = await AuditLog.find(logQuery).sort({ createdAt: -1 }).limit(100);
 
     return res.status(200).json({
       success: true,

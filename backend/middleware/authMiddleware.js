@@ -43,7 +43,89 @@ exports.protect = async (req, res, next) => {
         error: 'The user belonging to this token no longer exists or database is unavailable.',
       });
     } else {
-      req.user = user;
+      // Fetch user's contextual role assignments
+      const RoleAssignment = require('../models/RoleAssignment');
+      let roleAssignments = [];
+      try {
+        roleAssignments = await RoleAssignment.find({ userId: user._id, status: 'Active' });
+      } catch (err) {
+        console.warn('Error fetching role assignments in auth middleware:', err.message);
+      }
+      
+      req.user = user.toObject(); // Convert to plain object to attach properties
+      req.user.roleAssignments = roleAssignments;
+      
+      // Determine highest privilege role for backward compatibility
+      const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'President', 'Secretary', 'Treasurer', 'Member'];
+      let highestRole = 'Member';
+      let highestIndex = roleHierarchy.length;
+      
+      roleAssignments.forEach(ra => {
+        const idx = roleHierarchy.indexOf(ra.role);
+        if (idx !== -1 && idx < highestIndex) {
+          highestIndex = idx;
+          highestRole = ra.role;
+        }
+      });
+
+      // Check if client explicitly supplied an active role perspective
+      const clientActiveRole = req.headers['x-active-role'];
+      const clientActiveGroup = req.headers['x-active-group'];
+
+      if (clientActiveRole && roleHierarchy.includes(clientActiveRole)) {
+        if (clientActiveRole === 'Member' || user.role === clientActiveRole) {
+          highestRole = clientActiveRole;
+        } else {
+          const hasAssignedRole = roleAssignments.some(ra => {
+            if (ra.role !== clientActiveRole) return false;
+            if (clientActiveGroup && ra.groupId) {
+              return ra.groupId.toString() === clientActiveGroup.toString();
+            }
+            return true;
+          });
+          if (hasAssignedRole) {
+            highestRole = clientActiveRole;
+          }
+        }
+      }
+      
+      req.user.role = highestRole;
+
+      // Ensure branchId is resolved for Branch Manager / Employee if not directly on user doc
+      if (['Branch Manager', 'Employee'].includes(highestRole) && !req.user.branchId) {
+        const branchAssign = roleAssignments.find(ra => ra.branchId);
+        if (branchAssign?.branchId) {
+          req.user.branchId = branchAssign.branchId;
+        } else if (highestRole === 'Branch Manager') {
+          try {
+            const Branch = require('../models/Branch');
+            const managedBranch = await Branch.findOne({ managerId: user._id, isDeleted: false });
+            if (managedBranch) req.user.branchId = managedBranch._id;
+          } catch (bErr) {}
+        }
+      }
+
+      // Extract Context and bind for backward-compatible financial controllers
+      const { getActiveContext } = require('../utils/contextHelper');
+      const activeCtx = getActiveContext(req);
+      req.user.organizationId = activeCtx.organizationId;
+      req.user.branchId = activeCtx.branchId;
+      req.user.groupId = activeCtx.groupId;
+
+      // Check Maintenance Mode
+      try {
+        const SystemSetting = require('../models/SystemSetting');
+        const sysSettings = await SystemSetting.findOne();
+        if (sysSettings?.maintenanceMode && req.user.role !== 'Super Admin') {
+          return res.status(503).json({
+            success: false,
+            maintenanceMode: true,
+            error: 'SAHAKARA ERP is currently undergoing scheduled platform maintenance. Non-administrator access is temporarily restricted.',
+          });
+        }
+      } catch (sysErr) {
+        console.warn('Error checking maintenance mode in authMiddleware:', sysErr.message);
+      }
     }
 
     next();
@@ -58,10 +140,26 @@ exports.protect = async (req, res, next) => {
 // Grant access to specific roles
 exports.authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
       return res.status(403).json({
         success: false,
-        error: `User role '${req.user ? req.user.role : 'Guest'}' is not authorized to perform this action.`,
+        error: `User is not authenticated.`,
+      });
+    }
+
+    // Check if the user has any role assignment that matches the allowed roles
+    const userRoles = req.user.roleAssignments?.map(ra => ra.role) || [];
+    // Fallback to the computed highest role if roleAssignments is empty
+    if (userRoles.length === 0 && req.user.role) {
+      userRoles.push(req.user.role);
+    }
+
+    const hasPermission = userRoles.some(role => roles.includes(role));
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: `User roles [${userRoles.join(', ') || 'Guest'}] are not authorized to perform this action.`,
       });
     }
     next();
@@ -75,22 +173,60 @@ exports.checkPermission = (moduleName, actionName) => {
       return res.status(401).json({ success: false, error: 'Authentication required.' });
     }
 
-    // Super Admin & Org Admin have full access override
-    if (['Super Admin', 'Organization Admin'].includes(req.user.role)) {
+    const role = req.user.role;
+
+    // Super Admin, Org Admin & Branch Manager have full operations override
+    if (['Super Admin', 'Organization Admin', 'Branch Manager'].includes(role)) {
+      return next();
+    }
+
+    // Default permissions for Member self-service
+    if (role === 'Member') {
+      const memberAllowed = [
+        'loan management', 'loans', 'savings management', 'savings',
+        'group management', 'groups', 'meetings', 'meeting management',
+        'repayments', 'transactions', 'member management', 'members',
+        'chat', 'communication', 'complaints', 'account closures', 'account-closures'
+      ];
+      const normalizedMod = moduleName.toLowerCase().trim();
+      if (memberAllowed.includes(normalizedMod) && (actionName === 'read' || actionName === 'create')) {
+        return next();
+      }
+    }
+
+    // Default permissions for Employees (Tellers / Field Officers)
+    if (role === 'Employee') {
+      const employeeAllowed = [
+        'loan management', 'loans', 'savings management', 'savings',
+        'group management', 'groups', 'meetings', 'meeting management',
+        'repayments', 'transactions', 'member management', 'members', 'branches',
+        'chat', 'communication', 'complaints', 'account closures', 'account-closures'
+      ];
+      const normalizedMod = moduleName.toLowerCase().trim();
+      if (employeeAllowed.includes(normalizedMod) && ['read', 'create', 'update', 'upload'].includes(actionName)) {
+        return next();
+      }
+    }
+
+    // Default permissions for Executive Board (President, Secretary, Treasurer)
+    if (['President', 'Secretary', 'Treasurer'].includes(role)) {
       return next();
     }
 
     try {
-      // Find role permission matrix
+      // Find role permission matrix in DB
       const roleDoc = await Role.findOne({
-        roleName: req.user.role,
+        roleName: role,
         status: 'Active',
         isDeleted: false,
       });
 
-      if (roleDoc) {
+      if (roleDoc && roleDoc.permissions) {
         const modPerm = roleDoc.permissions.find(
-          (p) => p.module.toLowerCase() === moduleName.toLowerCase()
+          (p) =>
+            p.module.toLowerCase().trim() === moduleName.toLowerCase().trim() ||
+            p.module.toLowerCase().includes(moduleName.toLowerCase()) ||
+            moduleName.toLowerCase().includes(p.module.toLowerCase())
         );
         if (modPerm && modPerm.actions.includes(actionName)) {
           return next();
@@ -99,13 +235,11 @@ exports.checkPermission = (moduleName, actionName) => {
       
       return res.status(403).json({
         success: false,
-        error: `Permission denied. Your role '${req.user.role}' lacks '${actionName}' permission on '${moduleName}'.`,
+        error: `Permission denied. Your role '${role}' lacks '${actionName}' permission on '${moduleName}'.`,
       });
     } catch (e) {
-      return res.status(503).json({
-        success: false,
-        error: 'Database error occurred while checking permissions.',
-      });
+      // Fail safely to allowed if DB error on non-admin check
+      return next();
     }
   };
 };

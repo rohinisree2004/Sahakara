@@ -6,13 +6,17 @@ const AuditLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
     performerName: {
       type: String,
-      required: true,
+      default: 'System User',
     },
     performerRole: {
       type: String,
-      required: true,
+      default: 'Staff',
     },
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -22,9 +26,14 @@ const AuditLogSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    module: {
+      type: String,
+    },
     details: {
       type: String,
-      required: true,
+    },
+    description: {
+      type: String,
     },
     ipAddress: {
       type: String,
@@ -35,5 +44,24 @@ const AuditLogSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Auto-fill fallback fields before validation
+AuditLogSchema.pre('validate', function (next) {
+  if (!this.details && this.description) {
+    this.details = this.description;
+  } else if (!this.details) {
+    this.details = this.action || 'Audit event';
+  }
+  if (!this.performedBy && this.userId) {
+    this.performedBy = this.userId;
+  }
+  if (!this.performerName) {
+    this.performerName = 'System User';
+  }
+  if (!this.performerRole) {
+    this.performerRole = 'Staff';
+  }
+  next();
+});
 
 module.exports = mongoose.model('AuditLog', AuditLogSchema);

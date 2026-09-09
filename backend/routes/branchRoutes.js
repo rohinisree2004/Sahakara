@@ -18,7 +18,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Protect all Branch Management routes
 router.use(protect);
-router.use(authorize('Super Admin', 'Organization Admin', 'President', 'Secretary', 'Treasurer', 'Employee'));
+router.use(authorize('Super Admin', 'Organization Admin', 'Branch Manager', 'President', 'Secretary', 'Treasurer', 'Employee'));
 
 router.get('/dashboard', getBranchDashboard);
 router.get('/', getBranchesList);

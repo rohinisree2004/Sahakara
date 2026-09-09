@@ -10,7 +10,10 @@ import {
   Loader2, 
   Sparkles,
   ShieldAlert,
-  Building2
+  Building2,
+  ShieldCheck,
+  ChevronRight,
+  ArrowRight
 } from 'lucide-react';
 import { fetchMemberDashboard, fetchOrganizations } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,17 +71,17 @@ const MemberDashboardPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-rose-400">
-        <ShieldAlert className="w-12 h-12 mb-4 opacity-50" />
-        <h2 className="text-xl font-bold text-white mb-2">Dashboard Error</h2>
-        <p className="text-sm font-medium">{error}</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-rose-500 bg-white p-8 rounded-3xl border border-rose-100 max-w-lg mx-auto shadow-xs">
+        <ShieldAlert className="w-12 h-12 mb-3" />
+        <h2 className="text-lg font-black text-slate-900 mb-1">Dashboard Error</h2>
+        <p className="text-xs text-slate-500">{error}</p>
       </div>
     );
   }
@@ -98,36 +101,37 @@ const MemberDashboardPage = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       
       {/* Banner */}
-      <div className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-soft-teal space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-semibold text-emerald-400 mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Cooperative Member Operations</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <span>Cooperative Member Lifecycle Operations</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               Member Lifecycle & Enrollment Center
             </h1>
-            <p className="text-sm text-slate-400">
-              Manage cooperative account holders, verify Aadhaar & PAN KYCs, process board approvals, and track growth
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Manage cooperative account holders, verify Aadhaar & PAN KYC, process board approvals, and monitor growth.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {isSuperAdmin && (
-              <div className="flex items-center gap-2 bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-1.5">
-                <Building2 className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center gap-2 bg-slate-50 border border-teal-200 rounded-xl px-3.5 py-2 shadow-xs">
+                <Building2 className="w-4 h-4 text-teal-600" />
+                <span className="text-xs text-slate-500 font-bold hidden sm:inline">Society:</span>
                 <select
                   value={selectedOrgId}
                   onChange={(e) => setSelectedOrgId(e.target.value)}
-                  className="bg-transparent text-emerald-300 text-xs font-bold focus:outline-none cursor-pointer"
+                  className="bg-transparent text-teal-900 text-xs font-bold focus:outline-none cursor-pointer max-w-[180px] truncate"
                 >
-                  <option value="All" className="bg-slate-900 text-white">All Organizations (Global)</option>
+                  <option value="All">All Societies (Global)</option>
                   {organizations.map((org) => (
-                    <option key={org._id} value={org._id} className="bg-slate-900 text-white">
+                    <option key={org._id} value={org._id}>
                       {org.name} ({org.code || 'ORG'})
                     </option>
                   ))}
@@ -137,52 +141,70 @@ const MemberDashboardPage = () => {
 
             <Link
               to="/members/register"
-              className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+              className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-teal-600/20"
             >
               <UserPlus className="w-4 h-4" />
-              <span>New Member Enrollment</span>
+              <span>+ New Member Enrollment</span>
             </Link>
           </div>
         </div>
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
-        <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>Total Enrolled Members</span>
-            <Users className="w-4 h-4 text-emerald-400" />
+        <Link
+          to="/members/list"
+          className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:border-teal-300 hover:shadow-soft-teal transition-all group block"
+        >
+          <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
+            <span>Total Members</span>
+            <Users className="w-4 h-4 text-teal-600 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="text-3xl font-extrabold text-white">{info.totalMembers.toLocaleString()}</div>
-          <div className="text-[11px] text-emerald-400 font-medium">Across all branches</div>
-        </div>
+          <div className="text-3xl font-black text-slate-900">{info.totalMembers.toLocaleString()}</div>
+          <div className="text-[11px] text-teal-800 font-bold flex items-center justify-between">
+            <span>Enrolled in branches</span>
+            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </Link>
 
-        <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>Active Member Accounts</span>
-            <UserCheck className="w-4 h-4 text-teal-400" />
+        <Link
+          to="/members/list?status=Active"
+          className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:border-teal-300 hover:shadow-soft-teal transition-all group block"
+        >
+          <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
+            <span>Active Accounts</span>
+            <UserCheck className="w-4 h-4 text-teal-600 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="text-3xl font-extrabold text-teal-400">{info.activeMembers.toLocaleString()}</div>
-          <div className="text-[11px] text-slate-500">KYC verified & active</div>
-        </div>
+          <div className="text-3xl font-black text-slate-900">{info.activeMembers.toLocaleString()}</div>
+          <div className="text-[11px] text-teal-800 font-bold flex items-center justify-between">
+            <span>Active & compliant</span>
+            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </Link>
 
-        <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>Pending Board Approvals</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+        <Link
+          to="/members/approvals"
+          className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-2 hover:border-amber-300 hover:shadow-soft-teal transition-all group block"
+        >
+          <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
+            <span>Pending Approvals</span>
+            <Clock className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="text-3xl font-extrabold text-amber-400">{info.pendingApprovals}</div>
-          <div className="text-[11px] text-slate-500">Awaiting board sign-off</div>
-        </div>
+          <div className="text-3xl font-black text-amber-600">{info.pendingApprovals}</div>
+          <div className="text-[11px] text-slate-500 flex items-center justify-between">
+            <span>Awaiting Board sign-off</span>
+            <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
+          </div>
+        </Link>
 
-        <div className="glass-card p-6 rounded-2xl border border-slate-800 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-semibold">
-            <span>New Enrolled (This Month)</span>
-            <TrendingUp className="w-4 h-4 text-cyan-400" />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-bold uppercase tracking-wider">
+            <span>New (This Month)</span>
+            <TrendingUp className="w-4 h-4 text-teal-600" />
           </div>
-          <div className="text-3xl font-extrabold text-cyan-400">{info.newThisMonth}</div>
-          <div className="text-[11px] text-slate-500">+12% vs last month</div>
+          <div className="text-3xl font-black text-slate-900">{info.newThisMonth}</div>
+          <div className="text-[11px] text-teal-800 font-bold">New enrollments</div>
         </div>
 
       </div>
@@ -190,23 +212,23 @@ const MemberDashboardPage = () => {
       {/* Growth Visualization & Category Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <div className="glass-card p-6 rounded-3xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+          <h3 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
             <span>Membership Growth Trend</span>
-            <span className="text-xs font-mono text-emerald-400 font-bold">2024 YTD</span>
+            <span className="text-xs font-mono text-teal-800 font-bold">2026 YTD</span>
           </h3>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-1">
             {info.membershipGrowthTrend.map((item) => (
-              <div key={item.month} className="space-y-1">
-                <div className="flex justify-between text-xs text-slate-300 font-semibold">
+              <div key={item.month} className="space-y-1.5">
+                <div className="flex justify-between text-xs text-slate-700 font-bold">
                   <span>{item.month}</span>
-                  <span className="font-mono text-emerald-400">{item.count} Members</span>
+                  <span className="font-mono text-teal-800">{item.count} Members</span>
                 </div>
-                <div className="w-full h-3 rounded-full bg-slate-900 overflow-hidden">
+                <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className="h-full gradient-bg rounded-full transition-all duration-500"
-                    style={{ width: `${(item.count / 2600) * 100}%` }}
+                    className="h-full bg-gradient-to-r from-teal-500 to-teal-700 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(10, (item.count / 30) * 100))}%` }}
                   />
                 </div>
               </div>
@@ -214,35 +236,35 @@ const MemberDashboardPage = () => {
           </div>
         </div>
 
-        <div className="glass-card p-6 rounded-3xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-5">
+          <h3 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
             <span>Member Classification Breakdown</span>
-            <span className="text-xs font-mono text-teal-400 font-bold">Categories</span>
+            <span className="text-xs font-mono text-teal-800 font-bold">Categories</span>
           </h3>
 
-          <div className="space-y-3 pt-2">
-            <div className="flex justify-between items-center text-xs p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+          <div className="space-y-3 pt-1">
+            <div className="flex justify-between items-center text-xs p-4 rounded-2xl bg-slate-50 border border-slate-100">
               <div>
-                <div className="font-bold text-white">Regular Class 'A' Members</div>
+                <div className="font-bold text-slate-900">Regular Class 'A' Members</div>
                 <div className="text-[11px] text-slate-400">Full voting rights & share capital</div>
               </div>
-              <span className="font-mono text-emerald-400 font-bold text-sm">{info.categoryDistribution.regularMembers}</span>
+              <span className="font-mono text-teal-800 font-black text-base">{info.categoryDistribution.regularMembers}</span>
             </div>
 
-            <div className="flex justify-between items-center text-xs p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+            <div className="flex justify-between items-center text-xs p-4 rounded-2xl bg-slate-50 border border-slate-100">
               <div>
-                <div className="font-bold text-white">Associate Class 'B' Members</div>
-                <div className="text-[11px] text-slate-400 font-normal">Secondary holders & borrowers</div>
+                <div className="font-bold text-slate-900">Associate Class 'B' Members</div>
+                <div className="text-[11px] text-slate-400">Secondary holders & borrowers</div>
               </div>
-              <span className="font-mono text-teal-400 font-bold text-sm">{info.categoryDistribution.associateMembers}</span>
+              <span className="font-mono text-slate-800 font-black text-base">{info.categoryDistribution.associateMembers}</span>
             </div>
 
-            <div className="flex justify-between items-center text-xs p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+            <div className="flex justify-between items-center text-xs p-4 rounded-2xl bg-slate-50 border border-slate-100">
               <div>
-                <div className="font-bold text-white">Nominal Class 'C' Members</div>
-                <div className="text-[11px] text-slate-400 font-normal">Temporary transactional accounts</div>
+                <div className="font-bold text-slate-900">Nominal Class 'C' Members</div>
+                <div className="text-[11px] text-slate-400">Temporary transactional accounts</div>
               </div>
-              <span className="font-mono text-cyan-400 font-bold text-sm">{info.categoryDistribution.nominalMembers}</span>
+              <span className="font-mono text-slate-800 font-black text-base">{info.categoryDistribution.nominalMembers}</span>
             </div>
           </div>
         </div>

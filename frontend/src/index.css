@@ -4,54 +4,63 @@
 
 @layer base {
   html, body, #root {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen;
-    background-color: #020617 !important;
+    @apply bg-slate-50 text-slate-900 font-sans antialiased min-h-screen;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
   }
 }
 
-/* Glassmorphism Utilities */
+/* Modern Executive Teal & White Surfaces */
 .glass-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px -2px rgba(13, 148, 136, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .glass-nav {
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #e2e8f0;
 }
 
-/* Custom Gradients */
+/* Custom Teal Gradients */
 .gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-teal-800 via-teal-600 to-cyan-600;
 }
 
 .gradient-bg {
-  @apply bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600;
+  @apply bg-gradient-to-r from-teal-600 to-teal-700;
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0) 70%);
+  background: radial-gradient(circle at 50% 10%, rgba(20, 184, 166, 0.08) 0%, rgba(248, 250, 252, 0) 70%);
 }
 
-/* Custom Scrollbar */
+/* Modern Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #10b981;
+  background: #0d9488;
+}
+
+/* Form controls focus states */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
 }

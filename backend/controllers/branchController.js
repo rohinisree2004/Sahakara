@@ -1,15 +1,18 @@
 const Branch = require('../models/Branch');
 const Organization = require('../models/Organization');
 const User = require('../models/User');
+const RoleAssignment = require('../models/RoleAssignment');
 const AuditLog = require('../models/AuditLog');
 
 // Helper to resolve orgId & branchId from context
 const resolveScope = (req) => {
-  let orgId = req.user.organizationId || null;
-  if (req.user.role === 'Super Admin') {
-    orgId = req.query.organizationId || req.body.organizationId || null;
+  let orgId = req.user?.organizationId || null;
+  if (req.user?.role === 'Super Admin') {
+    const raw = req.query?.organizationId || req.body?.organizationId || null;
+    orgId = raw && raw !== 'All' && raw !== 'undefined' && raw !== 'null' ? raw : null;
   }
-  const branchId = req.query.branchId || req.params.id || null;
+  const rawBranch = req.query?.branchId || req.params?.id || req.body?.branchId || null;
+  const branchId = rawBranch && rawBranch !== 'All' && rawBranch !== 'undefined' && rawBranch !== 'null' ? rawBranch : null;
   return { orgId, branchId };
 };
 
@@ -33,36 +36,72 @@ const logBranchAudit = async (req, action, details, orgId, branchId) => {
 // @access  Private (Branch Manager, Org Admin, Super Admin, Execs, Employees)
 exports.getBranchDashboard = async (req, res, next) => {
   try {
-    const { orgId, branchId } = resolveScope(req);
+    let { orgId, branchId } = resolveScope(req);
     const Member = require('../models/Member');
     const Group = require('../models/Group');
-
-    let branch = null;
-    let branchFilter = { isDeleted: false };
-    if (orgId) branchFilter.organizationId = orgId;
-    if (branchId) branchFilter._id = branchId;
-
-    branch = await Branch.findOne(branchFilter);
-
-    const queryBranchId = branch ? branch._id : branchId;
-    const countFilter = { isDeleted: false };
-    if (orgId) countFilter.organizationId = orgId;
-    if (queryBranchId) countFilter.branchId = queryBranchId;
-
-    const employeeCount = await User.countDocuments({ ...countFilter, role: 'Employee' });
-    const memberCount = await Member.countDocuments(queryBranchId ? { ...(orgId && { organizationId: orgId }), branchId: queryBranchId } : (orgId ? { organizationId: orgId } : {}));
-    const groupCount = await Group.countDocuments(countFilter);
-
     const SavingsAccount = require('../models/SavingsAccount');
     const Loan = require('../models/Loan');
+    const Meeting = require('../models/Meeting');
 
+    // If user is Branch Manager, resolve his exact assigned branch
+    if (req.user.role === 'Branch Manager') {
+      if (!branchId && req.user.branchId) {
+        branchId = req.user.branchId;
+      }
+      if (!branchId) {
+        const managed = await Branch.findOne({ managerId: req.user._id, isDeleted: false });
+        if (managed) branchId = managed._id;
+      }
+      if (!branchId) {
+        const ra = await RoleAssignment.findOne({ userId: req.user._id, role: 'Branch Manager', status: 'Active' });
+        if (ra?.branchId) branchId = ra.branchId;
+      }
+      if (!branchId && orgId) {
+        const defaultBranch = await Branch.findOne({ organizationId: orgId, isDeleted: false });
+        if (defaultBranch) branchId = defaultBranch._id;
+      }
+    }
+
+    let branch = null;
+    let organization = null;
+    if (branchId) {
+      branch = await Branch.findById(branchId);
+      if (branch && !orgId) orgId = branch.organizationId;
+    }
+    if (orgId) {
+      organization = await Organization.findById(orgId);
+    }
+
+    const isScopedToSingleBranch = !!branch;
+    const queryBranchId = branch ? branch._id : null;
+
+    const totalBranchesCount = await Branch.countDocuments(orgId ? { organizationId: orgId, isDeleted: false } : { isDeleted: false });
+
+    const memberFilter = { isDeleted: false };
+    if (orgId) memberFilter.organizationId = orgId;
+    if (queryBranchId) memberFilter.branchId = queryBranchId;
+
+    const employeeFilter = { isActive: true };
+    if (orgId) employeeFilter.organizationId = orgId;
+    if (queryBranchId) employeeFilter.branchId = queryBranchId;
+    employeeFilter.role = { $in: ['Employee', 'Branch Manager'] };
+
+    const groupFilter = { isDeleted: false };
+    if (orgId) groupFilter.organizationId = orgId;
+    if (queryBranchId) groupFilter.branchId = queryBranchId;
+
+    const employeeCount = await User.countDocuments(employeeFilter);
+    const memberCount = await Member.countDocuments(memberFilter);
+    const groupCount = await Group.countDocuments(groupFilter);
+
+    const mongoose = require('mongoose');
     const savingsMatch = {};
-    if (orgId) savingsMatch.organizationId = orgId;
-    if (queryBranchId) savingsMatch.branchId = queryBranchId;
+    if (orgId) savingsMatch.organizationId = new mongoose.Types.ObjectId(orgId);
+    if (queryBranchId) savingsMatch.branchId = new mongoose.Types.ObjectId(queryBranchId);
 
     const loansMatch = { status: 'Disbursed' };
-    if (orgId) loansMatch.organizationId = orgId;
-    if (queryBranchId) loansMatch.branchId = queryBranchId;
+    if (orgId) loansMatch.organizationId = new mongoose.Types.ObjectId(orgId);
+    if (queryBranchId) loansMatch.branchId = new mongoose.Types.ObjectId(queryBranchId);
 
     const savingsAggr = await SavingsAccount.aggregate([
       ...(Object.keys(savingsMatch).length > 0 ? [{ $match: savingsMatch }] : []),
@@ -77,24 +116,68 @@ exports.getBranchDashboard = async (req, res, next) => {
     const totalLoans = loansAggr.length > 0 ? loansAggr[0].total : 0;
     const activeLoanAccounts = loansAggr.length > 0 ? loansAggr[0].count : 0;
 
+    const pendingLoansCount = await Loan.countDocuments({
+      ...(orgId && { organizationId: orgId }),
+      ...(queryBranchId && { branchId: queryBranchId }),
+      status: { $in: ['Applied', 'Under Review'] }
+    });
+
+    const pendingMembersKYC = await Member.countDocuments({
+      ...(orgId && { organizationId: orgId }),
+      ...(queryBranchId && { branchId: queryBranchId }),
+      status: 'Pending'
+    });
+
+    const branchGroups = await Group.find(groupFilter)
+      .populate('presidentId', 'fullName name')
+      .limit(6)
+      .lean();
+
+    let displayTitle = 'All Branch Operations';
+    let displayCode = 'GLOBAL';
+    if (branch) {
+      displayTitle = branch.branchName;
+      displayCode = branch.branchCode;
+    } else if (organization) {
+      displayTitle = `${organization.name} Branches`;
+      displayCode = organization.code || 'ORG';
+    }
+
     const dashboard = {
-      branchName: branch ? branch.branchName : (req.user.role === 'Super Admin' ? 'Platform All Branches' : 'Main Branch'),
-      branchCode: branch ? branch.branchCode : (req.user.role === 'Super Admin' ? 'GLOBAL' : 'MAIN'),
-      managerName: branch?.managerName || (req.user.role === 'Super Admin' ? req.user.name : ''),
+      isSingleBranch: isScopedToSingleBranch,
+      branchId: branch ? branch._id : null,
+      branchName: displayTitle,
+      branchCode: displayCode,
+      organizationName: organization ? organization.name : 'Cooperative Society Network',
+      organizationCode: organization ? organization.code : 'ORG',
+      managerName: branch?.managerName || (branch?.managerId ? req.user.name : 'Branch Manager'),
+      phone: branch?.phone || organization?.phone || '+91 98470 00000',
+      email: branch?.email || organization?.email || 'branch@sahakara.org',
+      address: branch?.address || (branch?.city ? `${branch.city}, ${branch.state}` : 'Main Town'),
+      totalBranches: totalBranchesCount,
       totalMembers: memberCount,
       activeMembers: memberCount,
       totalEmployees: employeeCount,
       totalGroups: groupCount,
       activeLoansCount: activeLoanAccounts,
-      activeLoansAmount: `₹ ${totalLoans.toLocaleString()}`,
-      monthlySavingsManaged: `₹ ${totalSavings.toLocaleString()}`,
+      pendingLoansCount: pendingLoansCount,
+      pendingMembersKYC: pendingMembersKYC,
+      totalPendingApprovals: pendingLoansCount + pendingMembersKYC,
+      activeLoansAmount: `₹ ${totalLoans.toLocaleString('en-IN')}`,
+      monthlySavingsManaged: `₹ ${totalSavings.toLocaleString('en-IN')}`,
+      groups: branchGroups,
       recentTransactions: [],
       upcomingMeetings: [],
     };
 
+    const recentLogs = await AuditLog.find(orgId ? { organizationId: orgId } : {})
+      .sort({ createdAt: -1 })
+      .limit(6);
+
     return res.status(200).json({
       success: true,
       data: dashboard,
+      recentActivities: recentLogs,
     });
   } catch (error) {
     next(error);
@@ -106,13 +189,22 @@ exports.getBranchDashboard = async (req, res, next) => {
 // @access  Private
 exports.getBranchesList = async (req, res, next) => {
   try {
-    const { orgId } = resolveScope(req);
+    const { orgId, branchId } = resolveScope(req);
     const { search, status } = req.query;
 
     let query = { isDeleted: false };
     if (orgId) {
       query.organizationId = orgId;
     }
+
+    // Strict Branch Isolation for Branch Manager & Employee
+    if (['Branch Manager', 'Employee'].includes(req.user.role)) {
+      const userBranchId = req.user.branchId || branchId;
+      if (userBranchId) {
+        query._id = userBranchId;
+      }
+    }
+
     if (status && status !== 'All') {
       query.status = status;
     }
@@ -241,26 +333,28 @@ exports.updateBranchProfile = async (req, res, next) => {
     const branchId = req.params.id;
     const { branchName, address, district, state, phone, email, workingHours, status } = req.body;
 
-    try {
-      const branch = await Branch.findOne({ _id: branchId, organizationId: orgId });
-      if (branch) {
-        if (branchName) branch.branchName = branchName;
-        if (address) branch.address = address;
-        if (district) branch.district = district;
-        if (state) branch.state = state;
-        if (phone) branch.phone = phone;
-        if (email) branch.email = email;
-        if (workingHours) branch.workingHours = workingHours;
-        if (status) branch.status = status;
-        await branch.save();
-      }
-    } catch (e) {}
+    const branchFilter = { _id: branchId, isDeleted: false };
+    if (orgId) branchFilter.organizationId = orgId;
 
-    await logBranchAudit(req, 'BRANCH_UPDATED', `Updated branch details for ${branchId}`, orgId, branchId);
+    const branch = await Branch.findOne(branchFilter);
+    if (branch) {
+      if (branchName) branch.branchName = branchName;
+      if (address) branch.address = address;
+      if (district) branch.district = district;
+      if (state) branch.state = state;
+      if (phone) branch.phone = phone;
+      if (email) branch.email = email;
+      if (workingHours) branch.workingHours = workingHours;
+      if (status) branch.status = status;
+      await branch.save();
+    }
+
+    await logBranchAudit(req, 'BRANCH_UPDATED', `Updated branch details for ${branch?.branchName || branchId}`, branch?.organizationId || orgId, branchId);
 
     return res.status(200).json({
       success: true,
       message: 'Branch details updated successfully.',
+      data: branch,
     });
   } catch (error) {
     next(error);
@@ -283,20 +377,22 @@ exports.assignBranchManager = async (req, res, next) => {
       });
     }
 
-    try {
-      const branch = await Branch.findOne({ _id: branchId, organizationId: orgId });
-      if (branch) {
-        branch.managerId = managerId || null;
-        branch.managerName = managerName;
-        await branch.save();
-      }
-    } catch (e) {}
+    const branchFilter = { _id: branchId, isDeleted: false };
+    if (orgId) branchFilter.organizationId = orgId;
 
-    await logBranchAudit(req, 'MANAGER_ASSIGNED', `Assigned '${managerName}' as Manager for branch ${branchId}`, orgId, branchId);
+    const branch = await Branch.findOne(branchFilter);
+    if (branch) {
+      branch.managerId = managerId || null;
+      branch.managerName = managerName;
+      await branch.save();
+    }
+
+    await logBranchAudit(req, 'MANAGER_ASSIGNED', `Assigned '${managerName}' as Manager for branch ${branch?.branchName || branchId}`, branch?.organizationId || orgId, branchId);
 
     return res.status(200).json({
       success: true,
       message: `Branch Manager '${managerName}' assigned successfully!`,
+      data: branch,
     });
   } catch (error) {
     next(error);
@@ -309,9 +405,38 @@ exports.assignBranchManager = async (req, res, next) => {
 exports.getBranchEmployees = async (req, res, next) => {
   try {
     const { orgId } = resolveScope(req);
-    const branchId = req.params.id;
+    const rawBranchId = req.params.id || req.query.branchId;
+    const branchId = rawBranchId && rawBranchId !== 'All' && rawBranchId !== 'undefined' ? rawBranchId : null;
 
-    const employees = await User.find({ organizationId: orgId, branchId, role: 'Employee' }).select('-password');
+    const staffRoles = ['Employee', 'Branch Manager', 'Organization Admin'];
+
+    const query = { isDeleted: false };
+    if (branchId) query.branchId = branchId;
+    if (orgId) query.organizationId = orgId;
+    query.role = { $in: staffRoles };
+
+    const assignments = await RoleAssignment.find(query)
+      .populate('userId', '-password')
+      .populate('organizationId', 'name code')
+      .populate('branchId', 'branchName branchCode');
+
+    let employees = [];
+    const seenUserIds = new Set();
+
+    for (const a of assignments) {
+      if (!a.userId || a.userId.isDeleted) continue;
+      const uid = a.userId._id.toString();
+      if (!seenUserIds.has(uid)) {
+        seenUserIds.add(uid);
+        const u = a.userId.toObject ? a.userId.toObject() : a.userId;
+        u.role = a.role;
+        u.roleAssignmentId = a._id;
+        u.organizationId = a.organizationId;
+        u.branchId = a.branchId;
+        u.assignmentStatus = a.status;
+        employees.push(u);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -323,15 +448,40 @@ exports.getBranchEmployees = async (req, res, next) => {
   }
 };
 
-// @desc    Get Branch Members Overview
+// @desc    Get Branch Members Overview (Stationed via Branch Groups)
 // @route   GET /api/v1/branches/:id/members
 // @access  Private
 exports.getBranchMembers = async (req, res, next) => {
   try {
     const { orgId } = resolveScope(req);
-    const branchId = req.params.id;
+    let rawBranchId = req.params.id || req.query.branchId;
+    if (['Branch Manager', 'Employee'].includes(req.user.role)) {
+      rawBranchId = req.user.branchId || rawBranchId;
+    }
+    const branchId = rawBranchId && rawBranchId !== 'All' && rawBranchId !== 'undefined' ? rawBranchId : null;
 
-    const members = await User.find({ organizationId: orgId, branchId, role: 'Member' }).select('-password');
+    let memberQuery = { isDeleted: false };
+    if (orgId) memberQuery.organizationId = orgId;
+
+    if (branchId) {
+      // Find all groups stationed under this branch
+      const branchGroups = await Group.find({ branchId, isDeleted: false }).select('_id');
+      const branchGroupIds = branchGroups.map(g => g._id);
+
+      memberQuery.$or = [
+        { groupIds: { $in: branchGroupIds } },
+        { groupId: { $in: branchGroupIds } },
+        { branchId: branchId },
+      ];
+    }
+
+    const members = await Member.find(memberQuery)
+      .populate('groupIds', 'groupName groupCode groupType')
+      .populate('groupId', 'groupName groupCode')
+      .populate('branchId', 'branchName branchCode')
+      .populate('organizationId', 'name code')
+      .populate('userId', 'username email')
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -350,7 +500,11 @@ exports.getBranchReports = async (req, res, next) => {
   try {
     const { type } = req.query;
     const { orgId } = resolveScope(req);
-    const branchId = req.params.id;
+    let branchId = req.params.id;
+
+    if (['Branch Manager', 'Employee'].includes(req.user.role)) {
+      branchId = req.user.branchId || branchId;
+    }
 
     const Member = require('../models/Member');
     const SavingsAccount = require('../models/SavingsAccount');

@@ -38,6 +38,9 @@ const CreateUserPage = () => {
   const [msg, setMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
+  const userBranchId = user?.branchId?._id || user?.branchId || '';
+
   // Load organizations for Super Admin
   useEffect(() => {
     if (isSuperAdmin) {
@@ -63,14 +66,19 @@ const CreateUserPage = () => {
       setLoadingBranches(true);
       try {
         const branchParams = {};
-        if (isSuperAdmin && formData.organizationId) {
+        if (isBranchScoped && userBranchId) {
+          branchParams.branchId = userBranchId;
+        } else if (isSuperAdmin && formData.organizationId) {
           branchParams.organizationId = formData.organizationId;
         }
         const res = await fetchBranchesList(branchParams);
         if (res.data && res.data.success) {
-          setBranches(res.data.data);
-          if (res.data.data.length > 0) {
-            setFormData((prev) => ({ ...prev, branchId: res.data.data[0]._id }));
+          const bList = res.data.data || [];
+          setBranches(bList);
+          if (isBranchScoped && userBranchId) {
+            setFormData((prev) => ({ ...prev, branchId: userBranchId }));
+          } else if (bList.length > 0) {
+            setFormData((prev) => ({ ...prev, branchId: bList[0]._id }));
           } else {
             setFormData((prev) => ({ ...prev, branchId: '' }));
           }
@@ -82,7 +90,7 @@ const CreateUserPage = () => {
       }
     };
     loadBranches();
-  }, [formData.organizationId]);
+  }, [formData.organizationId, isBranchScoped, userBranchId]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -108,48 +116,48 @@ const CreateUserPage = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <UserPlus className="w-6 h-6 text-cyan-400" />
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <UserPlus className="w-6 h-6 text-teal-600" />
             <span>Onboard New User Account</span>
           </h1>
-          <p className="text-xs text-slate-400">
-            Create user credentials with role assignment (Org Admin, President, Secretary, Treasurer, Employee, Member) and bcrypt encryption
+          <p className="text-xs text-slate-500">
+            Create user credentials with role assignment (Org Admin, President, Secretary, Treasurer, Employee, Member) and secure encryption
           </p>
         </div>
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
           <span>{msg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-3 shadow-xs">
+          <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
+      <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
         
         {/* Super Admin Organization Picker */}
         {isSuperAdmin && (
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Target Organization *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Target Organization *</label>
             <div className="relative">
               <select
                 name="organizationId"
                 value={formData.organizationId}
                 onChange={handleChange}
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold focus:bg-white focus:outline-none focus:border-teal-600"
               >
                 {organizations.map((org) => (
                   <option key={org._id} value={org._id}>
@@ -158,14 +166,14 @@ const CreateUserPage = () => {
                 ))}
               </select>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Branches will dynamically update based on the selected organization.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Branches will dynamically update based on the selected organization.</p>
           </div>
         )}
 
         {/* Form Fields Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
             <input
               type="text"
               name="name"
@@ -173,12 +181,12 @@ const CreateUserPage = () => {
               onChange={handleChange}
               required
               placeholder="e.g. Kavita Reddy"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Email Address *</label>
             <input
               type="email"
               name="email"
@@ -186,14 +194,14 @@ const CreateUserPage = () => {
               onChange={handleChange}
               required
               placeholder="e.g. kavita@coop.org"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Username *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Username *</label>
             <input
               type="text"
               name="username"
@@ -201,12 +209,12 @@ const CreateUserPage = () => {
               onChange={handleChange}
               required
               placeholder="e.g. kavita_reddy"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500 lowercase"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600 lowercase"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Temporary Password *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Temporary Password *</label>
             <input
               type="password"
               name="password"
@@ -214,19 +222,19 @@ const CreateUserPage = () => {
               onChange={handleChange}
               required
               placeholder="Min 6 characters"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Assigned Role *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Role *</label>
             <select
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
             >
               <option value="Organization Admin">Organization Admin</option>
               <option value="President">President</option>
@@ -238,12 +246,13 @@ const CreateUserPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Assigned Branch</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Branch</label>
             <select
               name="branchId"
               value={formData.branchId}
               onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              disabled={isBranchScoped}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:bg-white focus:outline-none focus:border-teal-600 disabled:opacity-80"
             >
               <option value="">Head Office / Unassigned</option>
               {branches.map((b) => (
@@ -253,12 +262,12 @@ const CreateUserPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Gender</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Gender</label>
             <select
               name="gender"
               value={formData.gender}
               onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
             >
               <option value="Male">Male</option>
               <option value="Female">Female</option>
@@ -269,26 +278,26 @@ const CreateUserPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
             <input
               type="text"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
               placeholder="+91 98765 43210"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Residential Address</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Residential Address</label>
             <input
               type="text"
               name="address"
               value={formData.address}
               onChange={handleChange}
               placeholder="City / Area Address"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             />
           </div>
         </div>
@@ -297,7 +306,7 @@ const CreateUserPage = () => {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-600/20 flex items-center gap-2 disabled:opacity-50 transition-colors"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             <span>Onboard User Account</span>

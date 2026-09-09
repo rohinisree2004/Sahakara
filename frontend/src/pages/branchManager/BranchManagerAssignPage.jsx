@@ -99,63 +99,53 @@ const BranchManagerAssignPage = () => {
     try {
       const res = await assignBranchManagerApi(selectedBranchId, { managerName: selectedManagerName });
       if (res.data && res.data.success) {
-        setMsg(`Branch Manager '${selectedManagerName}' assigned successfully!`);
-        const updated = branches.map((b) => (b._id === selectedBranchId ? { ...b, managerName: selectedManagerName } : b));
-        setBranches(updated);
+        setMsg(`Branch Manager updated to '${selectedManagerName}' successfully!`);
       }
     } catch (err) {
-      console.error(err.message);
+      console.error('Failed to assign branch manager:', err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
-      </div>
-    );
-  }
-
   const currentBranch = branches.find((b) => b._id === selectedBranchId) || branches[0];
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Award className="w-6 h-6 text-teal-400" />
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Award className="w-6 h-6 text-teal-600" />
             <span>Branch Manager Assignment Desk</span>
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Designate or re-assign branch managers to lead operational branches and oversee local tellers
           </p>
         </div>
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
           <span>{msg}</span>
         </div>
       )}
 
       {/* Assignment Card */}
-      <form onSubmit={handleAssignSubmit} className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
+      <form onSubmit={handleAssignSubmit} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
         
         {/* Super Admin Organization Picker */}
         {isSuperAdmin && (
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Select Organization Scope</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Select Organization Scope</label>
             <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-400" />
+              <Building2 className="w-4 h-4 text-teal-600" />
               <select
                 value={selectedOrgId}
                 onChange={(e) => setSelectedOrgId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-teal-200 text-teal-900 text-xs font-bold focus:bg-white focus:outline-none focus:border-teal-600"
               >
                 <option value="All">All Organizations</option>
                 {organizations.map((org) => (
@@ -165,17 +155,17 @@ const BranchManagerAssignPage = () => {
                 ))}
               </select>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">Filtering branches and staff for the selected cooperative society.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Filtering branches and staff for the selected cooperative society.</p>
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Select Operational Branch *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Select Operational Branch *</label>
             <select
               value={selectedBranchId}
               onChange={handleBranchChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             >
               {branches.map((b) => (
                 <option key={b._id} value={b._id}>
@@ -186,11 +176,11 @@ const BranchManagerAssignPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Assign Manager Name *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Assign Manager Name *</label>
             <select
               value={selectedManagerName}
               onChange={(e) => setSelectedManagerName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-500"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
             >
               <option value="">-- Choose Employee --</option>
               {employees.map((emp) => (
@@ -204,18 +194,18 @@ const BranchManagerAssignPage = () => {
 
         {/* Current Manager Badge */}
         {currentBranch && (
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 font-bold">
                 <User className="w-5 h-5" />
               </div>
               <div>
                 <div className="text-xs text-slate-400 font-medium">Current Assigned Manager</div>
-                <div className="text-sm font-bold text-white">{currentBranch.managerName || 'Unassigned'}</div>
+                <div className="text-sm font-bold text-slate-900">{currentBranch.managerName || 'Unassigned'}</div>
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+            <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-teal-50 border border-teal-200 text-teal-800">
               Active Status
             </span>
           </div>
@@ -225,7 +215,7 @@ const BranchManagerAssignPage = () => {
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-bold text-xs shadow-lg shadow-teal-500/20 flex items-center gap-2 disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-600/20 flex items-center gap-2 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
             <span>Confirm Manager Assignment</span>

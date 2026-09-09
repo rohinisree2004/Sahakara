@@ -25,21 +25,28 @@ export const getDashboardRoute = (role) => {
       return '/super-admin/dashboard';
     case 'Organization Admin':
       return '/org-admin/dashboard';
+    case 'Branch Manager':
+      return '/branches/dashboard';
     case 'President':
-    case 'Secretary':
-    case 'Treasurer':
       return '/executive/dashboard';
+    case 'Secretary':
+      return '/secretary/dashboard';
+    case 'Treasurer':
+      return '/treasurer/dashboard';
     case 'Employee':
       return '/employee/dashboard';
     case 'Member':
       return '/member/dashboard';
     default:
-      return '/login';
+      return '/member/dashboard';
   }
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [activeGroup, setActiveGroup] = useState(
+    JSON.parse(localStorage.getItem('sahakara_active_group') || sessionStorage.getItem('sahakara_active_group') || 'null')
+  );
   const [token, setToken] = useState(
     localStorage.getItem('sahakara_token') || sessionStorage.getItem('sahakara_token') || null
   );
@@ -52,15 +59,25 @@ export const AuthProvider = ({ children }) => {
         localStorage.getItem('sahakara_token') || sessionStorage.getItem('sahakara_token');
       const storedUser =
         localStorage.getItem('sahakara_user') || sessionStorage.getItem('sahakara_user');
+      const storedRole =
+        localStorage.getItem('sahakara_active_role') || sessionStorage.getItem('sahakara_active_role');
+      const storedGroup =
+        localStorage.getItem('sahakara_active_group') || sessionStorage.getItem('sahakara_active_group');
 
       if (storedToken && storedUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          if (storedRole) parsedUser.role = storedRole;
+          setUser(parsedUser);
+          if (storedGroup) setActiveGroup(JSON.parse(storedGroup));
           setToken(storedToken);
+
           // Verify with backend
           const res = await getAuthUser();
           if (res.data && res.data.success) {
-            setUser(res.data.data);
+            const freshUser = res.data.data;
+            if (storedRole) freshUser.role = storedRole;
+            setUser(freshUser);
           }
         } catch (err) {
           console.warn('[Auth Session Expired]:', err.message);
@@ -73,6 +90,27 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  // Switch Active Group & Dynamic Role
+  const switchActiveGroup = (group, newRole) => {
+    const roleToSet = newRole || group.role || 'Member';
+    setActiveGroup(group);
+
+    setUser(prevUser => {
+      if (!prevUser) return prevUser;
+      const updatedUser = { ...prevUser, role: roleToSet, activeGroup: group };
+      localStorage.setItem('sahakara_user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('sahakara_user', JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+
+    localStorage.setItem('sahakara_active_group', JSON.stringify(group));
+    sessionStorage.setItem('sahakara_active_group', JSON.stringify(group));
+    localStorage.setItem('sahakara_active_role', roleToSet);
+    sessionStorage.setItem('sahakara_active_role', roleToSet);
+
+    return getDashboardRoute(roleToSet);
+  };
+
   // Login handler
   const login = async (loginIdentifier, password, rememberMe = false) => {
     setLoading(true);
@@ -80,6 +118,13 @@ export const AuthProvider = ({ children }) => {
       const response = await loginUser({ loginIdentifier, password });
       if (response.data && response.data.success) {
         const { token: jwtToken, user: userData } = response.data;
+
+        // Reset previous active group selection so user always lands on fresh group selector
+        localStorage.removeItem('sahakara_active_group');
+        sessionStorage.removeItem('sahakara_active_group');
+        localStorage.removeItem('sahakara_active_role');
+        sessionStorage.removeItem('sahakara_active_role');
+        setActiveGroup(null);
 
         setToken(jwtToken);
         setUser(userData);
@@ -92,7 +137,10 @@ export const AuthProvider = ({ children }) => {
           sessionStorage.setItem('sahakara_user', JSON.stringify(userData));
         }
 
-        const targetRoute = getDashboardRoute(userData.role);
+        // Cooperative Members & Elected Executives land on Group Selection Page first
+        const isGroupMemberRole = ['Member', 'President', 'Secretary', 'Treasurer'].includes(userData.role);
+        const targetRoute = isGroupMemberRole ? '/select-group' : getDashboardRoute(userData.role);
+
         return { success: true, user: userData, targetRoute };
       }
     } catch (error) {
@@ -109,10 +157,15 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {}
     setToken(null);
     setUser(null);
+    setActiveGroup(null);
     localStorage.removeItem('sahakara_token');
     localStorage.removeItem('sahakara_user');
+    localStorage.removeItem('sahakara_active_role');
+    localStorage.removeItem('sahakara_active_group');
     sessionStorage.removeItem('sahakara_token');
     sessionStorage.removeItem('sahakara_user');
+    sessionStorage.removeItem('sahakara_active_role');
+    sessionStorage.removeItem('sahakara_active_group');
   };
 
   // Forgot password OTP request
@@ -132,6 +185,8 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    activeGroup,
+    switchActiveGroup,
     token,
     isAuthenticated: !!token && !!user,
     loading,

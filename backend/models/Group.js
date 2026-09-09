@@ -44,6 +44,18 @@ const GroupSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Member',
     },
+    presidentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Member',
+    },
+    secretaryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Member',
+    },
+    treasurerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Member',
+    },
     memberIds: [
       {
         type: mongoose.Schema.Types.ObjectId,

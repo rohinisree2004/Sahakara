@@ -406,14 +406,27 @@ exports.getOrganizationDetails = async (req, res, next) => {
     const Member = require('../models/Member');
     const SavingsAccount = require('../models/SavingsAccount');
     const Loan = require('../models/Loan');
+    const RoleAssignment = require('../models/RoleAssignment');
 
-    const [memberCount, employeeCount, branchCount, branches, users] = await Promise.all([
+    const orgAssignments = await RoleAssignment.find({ organizationId: org._id, status: 'Active' })
+      .populate('branchId', 'branchName branchCode');
+    const userIdsInOrg = orgAssignments.map(a => a.userId);
+
+    const [memberCount, branchCount, branches, rawUsers] = await Promise.all([
       Member.countDocuments({ organizationId: org._id }),
-      User.countDocuments({ organizationId: org._id, isDeleted: false }),
       Branch.countDocuments({ organizationId: org._id, isDeleted: false }),
       Branch.find({ organizationId: org._id, isDeleted: false }).sort({ createdAt: -1 }),
-      User.find({ organizationId: org._id, isDeleted: false }).select('-password').populate('branchId', 'branchName branchCode').sort({ createdAt: -1 }),
+      User.find({ _id: { $in: userIdsInOrg }, isDeleted: false }).select('-password').sort({ createdAt: -1 }),
     ]);
+
+    const users = rawUsers.map(u => {
+      const uObj = u.toObject();
+      const myAsgn = orgAssignments.find(a => a.userId.toString() === u._id.toString());
+      uObj.role = myAsgn?.role || 'Member';
+      uObj.branchId = myAsgn?.branchId || null;
+      return uObj;
+    });
+    const employeeCount = users.filter(u => u.role !== 'Member').length;
 
     const savingsAggr = await SavingsAccount.aggregate([
       { $match: { organizationId: org._id } },

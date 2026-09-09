@@ -71,9 +71,9 @@ const createLoanData = (orgId, branchId, prefix, loanTypeId, memberKeys, amounts
   });
 };
 
-createLoanData(orgIds.keralaUnity, branchIds.kottayamMain, 'KU', loanTypeIds.kuPersonal, ['KU1', 'KU2', 'KU3', 'KU4', 'KU5'], [25000, 50000, 75000, 100000, 20000], userIds.kuAdmin, userIds.kuPresident);
-createLoanData(orgIds.sahodaya, branchIds.ernakulamMain, 'SA', loanTypeIds.saPersonal, ['SA1', 'SA2', 'SA3'], [50000, 75000, 100000], userIds.saAdmin, userIds.saPresident);
-createLoanData(orgIds.greenValley, branchIds.palakkadMain, 'GV', loanTypeIds.gvAgriculture, ['GV1', 'GV2', 'GV3'], [30000, 60000, 90000], userIds.gvAdmin, userIds.gvPresident);
-createLoanData(orgIds.malabarWelfare, branchIds.kozhikodeMain, 'MW', loanTypeIds.mwBusiness, ['MW1', 'MW2', 'MW3'], [100000, 200000, 300000], userIds.mwAdmin, userIds.mwPresident);
+createLoanData(orgIds.keralaUnity, branchIds.kottayamMain, 'KU', loanTypeIds.kuPersonal, ['KU1', 'KU2', 'KU3', 'KU4', 'KU5'], [25000, 50000, 75000, 100000, 20000], userIds.kuAdmin, userIds.kuManagerKtm);
+createLoanData(orgIds.sahodaya, branchIds.ernakulamMain, 'SA', loanTypeIds.saPersonal, ['SA1', 'SA2', 'SA3'], [50000, 75000, 100000], userIds.saAdmin, userIds.saManagerEkm);
+createLoanData(orgIds.greenValley, branchIds.palakkadMain, 'GV', loanTypeIds.gvAgriculture, ['GV1', 'GV2', 'GV3'], [30000, 60000, 90000], userIds.gvAdmin, userIds.gvManagerPkd);
+createLoanData(orgIds.malabarWelfare, branchIds.kozhikodeMain, 'MW', loanTypeIds.mwBusiness, ['MW1', 'MW2', 'MW3'], [100000, 200000, 300000], userIds.mwAdmin, userIds.mwManagerKzd);
 
 module.exports = { loans, loanIds, loanReviews };

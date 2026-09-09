@@ -10,6 +10,7 @@ dotenv.config();
 
 // Connect to Database
 connectDB();
+require('./models');
 
 const app = express();
 
@@ -61,6 +62,9 @@ app.use('/api/v1/repayments', require('./routes/repaymentRoutes'));
 app.use('/api/v1/accounting', require('./routes/accountingRoutes'));
 app.use('/api/v1/transactions', require('./routes/transactionRoutes'));
 app.use('/api/v1/meetings', require('./routes/meetingRoutes'));
+app.use('/api/v1/chat', require('./routes/chatRoutes'));
+app.use('/api/v1/complaints', require('./routes/complaintRoutes'));
+app.use('/api/v1/account-closures', require('./routes/accountClosureRoutes'));
 // 404 Handler for undefined routes
 app.use((req, res, next) => {
   res.status(404).json({

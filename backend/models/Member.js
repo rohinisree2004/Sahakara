@@ -11,9 +11,19 @@ const MemberSchema = new mongoose.Schema(
     branchId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: [true, 'Member must belong to a branch'],
       index: true,
     },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      index: true,
+    },
+    groupIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Group',
+      },
+    ],
     memberId: {
       type: String,
       required: [true, 'Member ID is required'],
@@ -23,6 +33,7 @@ const MemberSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      index: true,
     },
     fullName: {
       type: String,

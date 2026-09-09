@@ -9,7 +9,10 @@ import {
   MapPin, 
   Mail, 
   Phone, 
-  Globe 
+  Globe,
+  Sparkles,
+  ShieldCheck,
+  FileCheck
 } from 'lucide-react';
 import { fetchOrgProfile, updateOrgProfileApi } from '../../services/api';
 
@@ -106,208 +109,252 @@ const OrgProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+      <div className="bg-white p-12 rounded-3xl border border-teal-100/80 text-center space-y-3 max-w-4xl mx-auto my-12 shadow-xs">
+        <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-xs font-bold text-slate-700">Loading Society Profile Configuration...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-8 max-w-4xl mx-auto pb-16">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-emerald-400" />
-            <span>Society Profile & Branding</span>
-          </h1>
-          <p className="text-xs text-slate-400">
-            Edit official registration details, head office location, contact numbers, and upload official society logo
-          </p>
+      {/* Header Banner */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/60 text-teal-800 text-xs font-bold uppercase tracking-wider mb-1 font-mono">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Society Master Records
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+          <span>Society Profile & Branding</span>
+        </h1>
+        <p className="text-slate-500 text-sm font-medium">
+          Edit official registration details, statutory bylaws classification, head office coordinates, and upload the official society seal emblem.
+        </p>
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-sm font-bold flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
           <span>{msg}</span>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-bold flex items-center gap-3 shadow-xs animate-shake">
+          <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="glass-card p-6 sm:p-8 rounded-3xl border border-slate-800 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* Logo Upload & Preview */}
-        <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
-          <div className="w-20 h-20 rounded-2xl gradient-bg flex items-center justify-center text-white overflow-hidden shrink-0 shadow-lg">
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
-              <Building2 className="w-10 h-10" />
-            )}
+        {/* Section 1: Emblem & Branding */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-6">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-teal-600" />
+              <span>Society Seal & Digital Identity</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              High-resolution insignia used on member passbooks, loan sanction letters, and share certificates.
+            </p>
           </div>
 
-          <div className="space-y-2 text-center sm:text-left">
-            <h4 className="text-sm font-bold text-white">Society Emblem / Logo Upload</h4>
-            <p className="text-xs text-slate-400">Upload high-resolution logo (PNG, JPG, max 5MB) for member passbooks and PDF reports.</p>
-            <label className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 border border-slate-700 cursor-pointer">
-              <Upload className="w-3.5 h-3.5" />
-              <span>Choose Image File</span>
-              <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-            </label>
-          </div>
-        </div>
+          <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-2xl bg-teal-50/40 border border-teal-200/60">
+            <div className="w-24 h-24 rounded-2xl bg-white border-2 border-dashed border-teal-300 flex items-center justify-center text-teal-700 overflow-hidden shrink-0 shadow-sm">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Society Logo" className="w-full h-full object-cover" />
+              ) : (
+                <Building2 className="w-10 h-10 text-teal-600" />
+              )}
+            </div>
 
-        {/* Form Fields Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Society Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Registration Number</label>
-            <input
-              type="text"
-              name="registrationNumber"
-              value={formData.registrationNumber}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
+            <div className="space-y-2 text-center sm:text-left flex-1">
+              <h4 className="text-sm font-bold text-slate-900">Official Society Emblem</h4>
+              <p className="text-xs text-slate-500 font-medium">PNG, JPG, or WEBP up to 5MB. Recommended square format 512x512.</p>
+              <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-xs font-bold text-white shadow-xs cursor-pointer transition-all">
+                <Upload className="w-4 h-4" />
+                <span>Upload New Logo</span>
+                <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+              </label>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Society Type</label>
-            <select
-              name="societyType"
-              value={formData.societyType}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            >
-              <option value="Credit Cooperative">Credit Co-op</option>
-              <option value="Agricultural Cooperative">Agricultural Co-op</option>
-              <option value="Housing Cooperative">Housing Co-op</option>
-              <option value="Multi-Purpose Cooperative">Multi-Purpose</option>
-            </select>
+        {/* Section 2: Registration & Legal Identification */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-teal-600" />
+              <span>Registration & Classification Details</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Statutory cooperative society registration number and functional classification.
+            </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Official Email *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Society Legal Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Registration / Statutory Number
+              </label>
+              <input
+                type="text"
+                name="registrationNumber"
+                value={formData.registrationNumber}
+                onChange={handleChange}
+                placeholder="e.g. K/1990/4521"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Society Classification</label>
+              <select
+                name="societyType"
+                value={formData.societyType}
+                onChange={handleChange}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              >
+                <option value="Credit Cooperative">Credit Cooperative</option>
+                <option value="Agricultural Cooperative">Agricultural Cooperative</option>
+                <option value="Housing Cooperative">Housing Cooperative</option>
+                <option value="Multi-Purpose Cooperative">Multi-Purpose Cooperative</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Official Email <span className="text-rose-500">*</span></label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Helpline Phone <span className="text-rose-500">*</span></label>
+              <input
+                type="text"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Registered Head Office & Address */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-xs space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-teal-600" />
+              <span>Registered Head Office & Website</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Physical address of head office and public online web presence.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Head Office Address</label>
             <input
-              type="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              name="address"
+              value={formData.address}
               onChange={handleChange}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+              placeholder="e.g. Cooperative Bhavan, MG Road"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Phone Number *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">City / District</label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">State</label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Pincode</label>
+              <input
+                type="text"
+                name="pincode"
+                value={formData.pincode}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500 font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Official Website URL</label>
             <input
               type="text"
-              name="phone"
-              value={formData.phone}
+              name="website"
+              value={formData.website}
               onChange={handleChange}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+              placeholder="https://examplecoop.org"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-500"
             />
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Head Office Address</label>
-          <input
-            type="text"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            placeholder="Street address / Landmark"
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">City</label>
-            <input
-              type="text"
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">State *</label>
-            <input
-              type="text"
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Pincode</label>
-            <input
-              type="text"
-              name="pincode"
-              value={formData.pincode}
-              onChange={handleChange}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Official Website URL</label>
-          <input
-            type="url"
-            name="website"
-            value={formData.website}
-            onChange={handleChange}
-            placeholder="https://vijayacoop.org"
-            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
-          />
-        </div>
-
-        {/* Submit Button */}
+        {/* Save Button */}
         <div className="pt-2 flex justify-end">
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+            className="px-8 py-3 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm shadow-md shadow-teal-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Saving Profile...</span>
+                <span>Updating Profile...</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>Update Society Profile</span>
+                <span>Save Society Profile</span>
               </>
             )}
           </button>

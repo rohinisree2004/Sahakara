@@ -1,15 +1,19 @@
 const Member = require('../models/Member');
 const Organization = require('../models/Organization');
 const Branch = require('../models/Branch');
+const Group = require('../models/Group');
+const GroupMembership = require('../models/GroupMembership');
+const RoleAssignment = require('../models/RoleAssignment');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 
-// Helper to resolve orgId from request context
+const { getActiveContext } = require('../utils/contextHelper');
+const { ensureMemberGroupSavingsAccount } = require('../utils/groupSavingsHelper');
+
+// Helper to resolve orgId from request context (backward compatibility)
 const getOrgId = (req) => {
-  if (req.user.role === 'Super Admin') {
-    return req.query.organizationId || req.body.organizationId || null;
-  }
-  return req.user.organizationId || null;
+  const { organizationId } = getActiveContext(req);
+  return organizationId;
 };
 
 // Helper to log member audit events
@@ -29,12 +33,21 @@ const logMemberAudit = async (req, action, details, orgId) => {
 
 // @desc    Get Member Dashboard Metrics
 // @route   GET /api/v1/members/dashboard
-// @access  Private (Org Admin, Super Admin, Execs, Branch Manager, Employees)
+// @access  Private
 exports.getMemberDashboard = async (req, res, next) => {
   try {
-    const orgId = getOrgId(req);
-    const query = { isDeleted: false };
-    if (orgId) query.organizationId = orgId;
+    const { organizationId, branchId: contextBranchId } = getActiveContext(req);
+    const { branchId: queryBranchId } = req.query;
+
+    let baseQuery = { isDeleted: false };
+    if (organizationId) baseQuery.organizationId = organizationId;
+    
+    // If context dictates a specific branch, enforce it. Otherwise, allow query filtering.
+    if (contextBranchId) {
+      baseQuery.branchId = contextBranchId;
+    } else if (queryBranchId && queryBranchId !== 'All') {
+      baseQuery.branchId = queryBranchId;
+    }
 
     let totalMembers = 0;
     let activeMembers = 0;
@@ -46,17 +59,17 @@ exports.getMemberDashboard = async (req, res, next) => {
     let nominalMembers = 0;
 
     try {
-      totalMembers = await Member.countDocuments(query);
-      activeMembers = await Member.countDocuments({ ...query, membershipStatus: 'Active' });
-      pendingMembers = await Member.countDocuments({ ...query, membershipStatus: 'Pending' });
-      suspendedMembers = await Member.countDocuments({ ...query, membershipStatus: 'Suspended' });
+      totalMembers = await Member.countDocuments(baseQuery);
+      activeMembers = await Member.countDocuments({ ...baseQuery, membershipStatus: 'Active' });
+      pendingMembers = await Member.countDocuments({ ...baseQuery, membershipStatus: 'Pending' });
+      suspendedMembers = await Member.countDocuments({ ...baseQuery, membershipStatus: 'Suspended' });
 
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      newThisMonth = await Member.countDocuments({ ...query, createdAt: { $gte: startOfMonth } });
+      newThisMonth = await Member.countDocuments({ ...baseQuery, createdAt: { $gte: startOfMonth } });
 
-      regularMembers = await Member.countDocuments({ ...query, category: 'Regular Member' });
-      associateMembers = await Member.countDocuments({ ...query, category: 'Associate Member' });
-      nominalMembers = await Member.countDocuments({ ...query, category: 'Nominal Member' });
+      regularMembers = await Member.countDocuments({ ...baseQuery, category: 'Regular Member' });
+      associateMembers = await Member.countDocuments({ ...baseQuery, category: 'Associate Member' });
+      nominalMembers = await Member.countDocuments({ ...baseQuery, category: 'Nominal Member' });
     } catch (e) {}
 
     const dashboard = {
@@ -87,14 +100,20 @@ exports.getMemberDashboard = async (req, res, next) => {
 // @access  Private
 exports.getMembersList = async (req, res, next) => {
   try {
-    const orgId = getOrgId(req);
-    const { search, status, branchId, category } = req.query;
+    const { organizationId, branchId: contextBranchId } = getActiveContext(req);
+    const { search, status, branchId: queryBranchId, category } = req.query;
 
     let query = { isDeleted: false };
-    if (orgId) query.organizationId = orgId;
+    if (organizationId) query.organizationId = organizationId;
     if (status && status !== 'All') query.membershipStatus = status;
-    if (branchId && branchId !== 'All') query.branchId = branchId;
     if (category && category !== 'All') query.category = category;
+    
+    // If context dictates a specific branch, enforce it. Otherwise, allow query filtering.
+    if (contextBranchId) {
+      query.branchId = contextBranchId;
+    } else if (queryBranchId && queryBranchId !== 'All') {
+      query.branchId = queryBranchId;
+    }
 
     if (search) {
       query.$or = [
@@ -108,12 +127,53 @@ exports.getMembersList = async (req, res, next) => {
     const members = await Member.find(query)
       .populate('branchId', 'branchName branchCode')
       .populate('organizationId', 'name code')
+      .populate('groupIds', 'groupName groupCode groupType')
+      .populate('groupId', 'groupName groupCode')
+      .populate('userId', 'username email')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
       count: members.length,
       data: members,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get Current Authenticated Member Profile
+// @route   GET /api/v1/members/me
+// @access  Private
+exports.getMyProfile = async (req, res, next) => {
+  try {
+    const filters = [];
+    if (req.user._id) filters.push({ userId: req.user._id });
+    if (req.user.phone) filters.push({ phone: req.user.phone });
+    if (req.user.email) filters.push({ email: req.user.email });
+    if (req.user.name) filters.push({ fullName: req.user.name });
+
+    let member = await Member.findOne({ $or: filters, isDeleted: false })
+      .populate('branchId', 'branchName branchCode address district state')
+      .populate('organizationId', 'name code address email phone')
+      .populate('groupIds', 'groupName groupCode groupType leaderId presidentId secretaryId treasurerId')
+      .populate('groupId', 'groupName groupCode');
+
+    if (!member && req.user.organizationId) {
+      member = await Member.findOne({ organizationId: req.user.organizationId, isDeleted: false })
+        .populate('branchId', 'branchName branchCode address district state')
+        .populate('organizationId', 'name code address email phone')
+        .populate('groupIds', 'groupName groupCode groupType leaderId presidentId secretaryId treasurerId')
+        .populate('groupId', 'groupName groupCode');
+    }
+
+    if (!member) {
+      return res.status(404).json({ success: false, error: 'Member profile record not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: member,
     });
   } catch (error) {
     next(error);
@@ -138,6 +198,10 @@ exports.registerMember = async (req, res, next) => {
       pincode,
       occupation,
       branchId,
+      groupId,
+      groupIds,
+      password,
+      username,
       category,
       nomineeName,
       nomineeRelationship,
@@ -174,23 +238,79 @@ exports.registerMember = async (req, res, next) => {
       });
     }
 
-    // Auto Generate Unique Member ID: MEM-2026-XXX
-    let generatedMemberId = `MEM-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    // Determine group list (1 to 4 groups max)
+    let selectedGroupIds = [];
+    if (Array.isArray(groupIds)) {
+      selectedGroupIds = groupIds.filter(Boolean);
+    } else if (groupIds) {
+      selectedGroupIds = [groupIds];
+    } else if (groupId) {
+      selectedGroupIds = [groupId];
+    }
 
+    if (selectedGroupIds.length > 4) {
+      return res.status(400).json({
+        success: false,
+        error: 'A member cannot belong to more than 4 groups.',
+      });
+    }
+
+    const primaryGroupId = selectedGroupIds[0] || null;
+
+    // If branch is not specified, derive it from the primary group's branch
+    if (!branch && primaryGroupId) {
+      const primaryGroupDoc = await Group.findById(primaryGroupId);
+      if (primaryGroupDoc && primaryGroupDoc.branchId) {
+        branch = primaryGroupDoc.branchId;
+      }
+    }
+
+    // Auto Generate Unique Member ID: MEM-2026-XXX
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const generatedMemberId = `MEM-${new Date().getFullYear()}-${randomSuffix}`;
+
+    // 1. Create or Find associated User Login Account with Password
+    const cleanUsername = (username || `mem_${fullName.toLowerCase().replace(/[^a-z0-9]/g, '')}_${randomSuffix}`).slice(0, 25);
+    const userEmail = email || `${cleanUsername}@coop.local`;
+    const memberPassword = password || 'password123';
+
+    let userAccount = await User.findOne({
+      $or: [{ username: cleanUsername }, { email: userEmail }],
+    });
+
+    if (!userAccount) {
+      userAccount = await User.create({
+        name: fullName,
+        username: cleanUsername,
+        email: userEmail,
+        password: memberPassword,
+        phone,
+        gender: gender || 'Male',
+        dob: dob || null,
+        address: address || '',
+        role: 'Member',
+        createdBy: req.user?._id,
+      });
+    }
+
+    // 2. Create Member Record
     const newMember = await Member.create({
       organizationId: finalOrgId,
       branchId: branch,
+      groupId: primaryGroupId,
+      groupIds: selectedGroupIds,
+      userId: userAccount._id,
       memberId: generatedMemberId,
       fullName,
       gender: gender || 'Male',
       dob: dob || null,
       phone,
-      email: email || '',
+      email: userEmail,
       address: address || '',
       district: district || '',
-      state: state || 'Karnataka',
+      state: state || 'Kerala',
       pincode: pincode || '',
-      occupation: occupation || 'Business',
+      occupation: occupation || 'Self-Employed',
       category: category || 'Regular Member',
       nominee: {
         name: nomineeName || '',
@@ -204,14 +324,49 @@ exports.registerMember = async (req, res, next) => {
         kycVerified: false,
       },
       membershipStatus: 'Pending',
-      createdBy: req.user._id,
+      createdBy: req.user?._id,
     });
 
-    await logMemberAudit(req, 'MEMBER_REGISTERED', `Enrolled new member '${fullName}' (${generatedMemberId})`, orgId);
+    // 3. Create RoleAssignment
+    await RoleAssignment.create({
+      userId: userAccount._id,
+      role: 'Member',
+      organizationId: finalOrgId,
+      branchId: branch,
+      groupId: primaryGroupId,
+      status: 'Active',
+    });
+
+    // 4. Create GroupMembership records for each selected group (1-4 groups)
+    for (const gid of selectedGroupIds) {
+      try {
+        await GroupMembership.create({
+          userId: userAccount._id,
+          groupId: gid,
+          organizationId: finalOrgId,
+          branchId: branch,
+          memberId: generatedMemberId,
+          status: 'Active',
+        });
+
+        // Add member to group roster
+        await Group.findByIdAndUpdate(gid, {
+          $addToSet: { memberIds: newMember._id },
+          $inc: { totalMembers: 1 },
+        });
+
+        // Auto-generate dedicated group savings account and passbook deposit
+        await ensureMemberGroupSavingsAccount(newMember._id, gid, finalOrgId, branch, req.user?._id);
+      } catch (grpErr) {
+        console.warn(`Group membership insertion notice for group ${gid}:`, grpErr.message);
+      }
+    }
+
+    await logMemberAudit(req, 'MEMBER_REGISTERED', `Enrolled member '${fullName}' (${generatedMemberId}) in ${selectedGroupIds.length} groups`, finalOrgId);
 
     return res.status(201).json({
       success: true,
-      message: `Member '${fullName}' enrolled successfully with ID '${generatedMemberId}'!`,
+      message: `Member '${fullName}' enrolled successfully! Member ID: ${generatedMemberId}. Username: ${cleanUsername}`,
       data: newMember,
     });
   } catch (error) {
@@ -227,7 +382,11 @@ exports.getMemberProfile = async (req, res, next) => {
     const orgId = getOrgId(req);
     const memberId = req.params.id;
 
-    const member = await Member.findOne({ _id: memberId, organizationId: orgId }).populate('branchId', 'branchName branchCode');
+    const member = await Member.findOne({ _id: memberId, organizationId: orgId })
+      .populate('branchId', 'branchName branchCode')
+      .populate('groupIds', 'groupName groupCode groupType')
+      .populate('groupId', 'groupName groupCode')
+      .populate('userId', 'username email');
 
     if (!member) {
       return res.status(404).json({ success: false, error: 'Member not found' });

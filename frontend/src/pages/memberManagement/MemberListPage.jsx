@@ -10,7 +10,12 @@ import {
   Trash2, 
   CheckCircle2, 
   Loader2,
-  Building2 
+  Building2,
+  GitBranch,
+  RefreshCw,
+  Sparkles,
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
 import { fetchMembersList, toggleMemberStatusApi, deleteMemberApi, fetchBranchesList, fetchOrganizations } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +23,8 @@ import { useAuth } from '../../contexts/AuthContext';
 const MemberListPage = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'Super Admin';
+  const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
+  const userBranchId = user?.branchId?._id || user?.branchId || '';
 
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrgId, setSelectedOrgId] = useState('All');
@@ -27,7 +34,7 @@ const MemberListPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [branchFilter, setBranchFilter] = useState('All');
+  const [branchFilter, setBranchFilter] = useState(isBranchScoped ? userBranchId : 'All');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
   const [msg, setMsg] = useState('');
@@ -52,8 +59,13 @@ const MemberListPage = () => {
   const loadMembers = async () => {
     setLoading(true);
     try {
-      const memberParams = { search, status: statusFilter, branchId: branchFilter, category: categoryFilter };
+      const effectiveBranch = isBranchScoped ? userBranchId : branchFilter;
+      const memberParams = { search, status: statusFilter, branchId: effectiveBranch, category: categoryFilter };
       const branchParams = {};
+
+      if (isBranchScoped && userBranchId) {
+        branchParams.branchId = userBranchId;
+      }
 
       if (isSuperAdmin && selectedOrgId && selectedOrgId !== 'All') {
         memberParams.organizationId = selectedOrgId;
@@ -112,63 +124,68 @@ const MemberListPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-emerald-400" />
-            <span>Member Registry & Directory</span>
-          </h1>
-          <p className="text-xs text-slate-400">
-            Search enrolled cooperative members, view savings/loan summaries, and manage account statuses
-          </p>
-        </div>
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-teal-100/80 shadow-soft-teal space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <span>Cooperative Member Accounts & Registry</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Member Directory
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Search enrolled cooperative members, inspect KYC statuses, and manage accounts across branches.
+            </p>
+          </div>
 
-        <Link
-          to="/members/register"
-          className="px-4 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>New Member Enrollment</span>
-        </Link>
+          <Link
+            to="/members/register"
+            className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all flex items-center gap-2 shadow-md shadow-teal-600/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>+ New Member Enrollment</span>
+          </Link>
+        </div>
       </div>
 
       {msg && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{msg}</span>
+        <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-3 shadow-xs">
+          <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
+          <span className="font-semibold">{msg}</span>
         </div>
       )}
 
       {/* Toolbar */}
-      <div className="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-4 justify-between items-center">
         <form onSubmit={handleSearchSubmit} className="relative w-full md:w-80">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search Member ID, name, phone..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-500/10 transition-all"
           />
         </form>
 
         <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
           {/* Super Admin Organization Filter */}
           {isSuperAdmin && (
-            <div className="flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-emerald-400" />
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-teal-200 rounded-xl px-3 py-1.5 shadow-xs">
+              <Building2 className="w-4 h-4 text-teal-600" />
               <select
                 value={selectedOrgId}
                 onChange={(e) => {
                   setSelectedOrgId(e.target.value);
                   setBranchFilter('All');
                 }}
-                className="px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 font-bold focus:outline-none"
+                className="bg-transparent text-teal-900 font-bold focus:outline-none cursor-pointer max-w-[160px] truncate"
               >
-                <option value="All">All Organizations</option>
+                <option value="All">All Societies</option>
                 {organizations.map((org) => (
                   <option key={org._id} value={org._id}>
                     {org.name} ({org.code || 'ORG'})
@@ -178,109 +195,163 @@ const MemberListPage = () => {
             </div>
           )}
 
-          <Filter className="w-4 h-4 text-slate-500" />
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-transparent text-slate-700 font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Pending">Pending</option>
+              <option value="Suspended">Suspended</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
-          >
-            <option value="All">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Pending">Pending</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+          {!isBranchScoped && (
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+              <GitBranch className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="bg-transparent text-slate-700 font-bold focus:outline-none cursor-pointer max-w-[140px] truncate"
+              >
+                <option value="All">All Branches</option>
+                {branches.map((b) => (
+                  <option key={b._id} value={b._id}>{b.branchName}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          <select
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
-          >
-            <option value="All">All Branches</option>
-            {branches.map((b) => (
-              <option key={b._id} value={b._id}>{b.branchName}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-transparent text-slate-700 font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Categories</option>
+              <option value="Regular Member">Regular Class A</option>
+              <option value="Associate Member">Associate Class B</option>
+              <option value="Nominal Member">Nominal Class C</option>
+            </select>
+          </div>
 
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-medium focus:outline-none"
+          <button
+            onClick={loadMembers}
+            className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-xs"
+            title="Refresh list"
           >
-            <option value="All">All Categories</option>
-            <option value="Regular Member">Regular Class A</option>
-            <option value="Associate Member">Associate Class B</option>
-            <option value="Nominal Member">Nominal Class C</option>
-          </select>
+            <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
+          </button>
         </div>
       </div>
 
       {/* Members Table */}
       {loading ? (
-        <div className="flex items-center justify-center p-12 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+        <div className="flex items-center justify-center p-16 bg-white rounded-3xl border border-slate-200 shadow-xs">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+        </div>
+      ) : members.length === 0 ? (
+        <div className="bg-white p-12 text-center rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-700 mx-auto font-bold">
+            <Users className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-slate-900">No Members Found</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              No cooperative members matched the selected society, branch, or filter criteria.
+            </p>
+          </div>
+          <Link
+            to="/members/register"
+            className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-teal-600/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Enroll Member</span>
+          </Link>
         </div>
       ) : (
-        <div className="glass-card rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-teal-50/70 text-teal-900 uppercase tracking-wider font-bold border-b border-teal-100 text-[11px]">
                 <tr>
-                  <th className="px-6 py-4">Member Name</th>
-                  <th className="px-6 py-4">Membership ID</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Branch</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-3.5">Member Name</th>
+                  <th className="px-6 py-3.5">Membership ID</th>
+                  <th className="px-6 py-3.5">Category</th>
+                  <th className="px-6 py-3.5">Branch Location</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
+              <tbody className="divide-y divide-slate-100">
                 {members.map((m) => (
-                  <tr key={m._id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-white">
+                  <tr key={m._id} className="hover:bg-teal-50/30 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-900">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 font-mono">
+                        <div className="w-9 h-9 rounded-full bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0 font-mono font-bold">
                           {m.fullName ? m.fullName[0] : 'M'}
                         </div>
                         <div>
-                          <div>{m.fullName}</div>
-                          <div className="text-[11px] text-slate-500 font-normal">{m.phone}</div>
+                          <div className="text-slate-900 font-black">{m.fullName}</div>
+                          <div className="text-[11px] text-slate-400 font-normal">{m.phone || 'Phone N/A'}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-mono font-bold text-emerald-400">{m.memberId}</td>
-                    <td className="px-6 py-4 text-slate-300">{m.category}</td>
-                    <td className="px-6 py-4 text-slate-300">
+
+                    <td className="px-6 py-4 font-mono font-bold text-teal-800">
+                      <span className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200">
+                        {m.memberId}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        m.category === 'Regular Member'
+                          ? 'bg-teal-50 border-teal-200 text-teal-800'
+                          : m.category === 'Associate Member'
+                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                          : 'bg-slate-50 border-slate-200 text-slate-700'
+                      }`}>
+                        {m.category || 'Regular Member'}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 text-slate-700 font-semibold">
                       {m.branchId ? m.branchId.branchName || 'Assigned Branch' : 'Head Office'}
                     </td>
+
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         m.membershipStatus === 'Active'
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          ? 'bg-teal-50 border-teal-200 text-teal-800'
                           : m.membershipStatus === 'Pending'
-                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          ? 'bg-amber-50 border-amber-200 text-amber-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-700'
                       }`}>
                         {m.membershipStatus}
                       </span>
                     </td>
+
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Link
                           to={`/members/profile/${m._id}`}
-                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1"
+                          className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold flex items-center gap-1 shadow-xs transition-colors"
                         >
-                          <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                          <Eye className="w-3.5 h-3.5 text-teal-600" />
                           <span>Profile</span>
                         </Link>
 
                         <button
                           onClick={() => handleToggleStatus(m)}
-                          className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1 border border-slate-700 ${
+                          className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 border shadow-xs transition-colors ${
                             m.membershipStatus === 'Active'
-                              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                              : 'bg-teal-50 border-teal-200 text-teal-800 hover:bg-teal-100'
                           }`}
                         >
                           <Power className="w-3.5 h-3.5" />
@@ -289,7 +360,8 @@ const MemberListPage = () => {
 
                         <button
                           onClick={() => handleDelete(m)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400"
+                          className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 shadow-xs transition-colors"
+                          title="Remove Member"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
