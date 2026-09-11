@@ -1,376 +1,175 @@
-<div align="center">
+# 🌱 SAHAKARA ERP
 
-# 🌱 Sahakara ERP
+### *Cloud-Native Multi-Tenant Cooperative Society & SHG/JLG ERP Platform*
 
-### *A Multi-Organization Cooperative Society ERP System*
-
-<img src="https://readme-typing-svg.demolab.com?font=Poppins&weight=600&size=26&pause=1000&color=2E8B57&center=true&vCenter=true&width=700&lines=Multi-Organization+Cooperative+Society+ERP;Built+with+MERN+Stack;Secure+%7C+Scalable+%7C+Modern;MCA+Mini+Project" />
-
----
-
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react)
-![NodeJS](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js)
-![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express)
-![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css)
-![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=jsonwebtokens)
-![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary)
-
-</div>
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=for-the-badge)
+![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)
+![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
+![NodeJS](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=node.js)
+![Express](https://img.shields.io/badge/Express-4.x-000000?style=for-the-badge&logo=express)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.x-4EA94B?style=for-the-badge&logo=mongodb)
+![Mongoose](https://img.shields.io/badge/Mongoose-8.x-880000?style=for-the-badge&logo=mongoose)
+![JWT](https://img.shields.io/badge/JWT-HS256-black?style=for-the-badge&logo=jsonwebtokens)
 
 ---
 
-# 📖 About
+## 📌 Executive Summary
 
-**Sahakara ERP** is a **Multi-Organization Cooperative Society ERP System** developed using the **MERN Stack**.
+**Sahakara ERP** is an end-to-end Enterprise Resource Planning (ERP) platform designed for **Primary Agricultural Credit Societies (PACS)**, Urban Cooperative Societies, Kudumbashree Units, Self-Help Groups (**SHG**), and Joint Liability Groups (**JLG**).
 
-Unlike traditional cooperative management software that supports only one society, Sahakara ERP allows multiple cooperative societies to operate on a single platform while maintaining complete data isolation and security.
-
-Every organization has:
-
-- Independent administration
-- Independent branches
-- Independent members
-- Independent financial records
-- Independent reports
-
-All managed from one centralized ERP platform.
+Built in compliance with the **Kerala Cooperative Societies Act (1969)** and the **NABARD SHG-Bank Linkage Framework**, the system digitizes grassroots community finance with modern institutional banking standards.
 
 ---
 
-# ✨ Key Features
+## 🏛 Hierarchical Multi-Tenancy Architecture
 
-✅ Multi-Organization Support
-
-✅ Role-Based Access Control (RBAC)
-
-✅ Branch Management
-
-✅ Member Management
-
-✅ Savings Management
-
-✅ Loan Management
-
-✅ EMI Tracking
-
-✅ Accounting
-
-✅ Meeting Management
-
-✅ Document Management
-
-✅ Reports & Analytics
-
-✅ Notifications
-
-✅ Audit Logs
-
-✅ Dashboard Analytics
-
----
-
-# 🏗 System Architecture
-
-```text
-                Super Admin
-                     │
-    ┌────────────────┼────────────────┐
-    │                │                │
-Organization A   Organization B   Organization C
-    │                │                │
- Branches        Branches        Branches
-    │                │                │
- Employees       Employees       Employees
-    │                │                │
- Members         Members         Members
+```
+                    ┌──────────────────────────────┐
+                    │      1. SUPER ADMIN          │
+                    │  (Platform Owner / Regulator)│
+                    └──────────────┬───────────────┘
+                                   │
+                    ┌──────────────▼───────────────┐
+                    │    2. ORGANIZATION ADMIN     │
+                    │  (Society General Manager)   │
+                    └──────────────┬───────────────┘
+                                   │
+                    ┌──────────────▼───────────────┐
+                    │     3. BRANCH MANAGER        │
+                    │   (Branch Credit Committee)  │
+                    └───────┬──────────────┬───────┘
+                            │              │
+      ┌─────────────────────┴──────┐  ┌────┴────────────────────────┐
+      │        7. EMPLOYEE         │  │     SHG / JLG LEADERSHIP     │
+      │   (Field Loan Officer)     │  │  ┌────────────────────────┐ │
+      └────────────────────────────┘  │  │     4. PRESIDENT       │ │
+                                      │  │ (Democratic Leader)    │ │
+                                      │  └───────────┬────────────┘ │
+                                      │              │              │
+                                      │  ┌───────────▼────────────┐ │
+                                      │  │     5. SECRETARY       │ │
+                                      │  │  (Meetings & Minutes)  │ │
+                                      │  └───────────┬────────────┘ │
+                                      │              │              │
+                                      │  ┌───────────▼────────────┐ │
+                                      │  │     6. TREASURER       │ │
+                                      │  │ (Thrift & Collections) │ │
+                                      │  └───────────┬────────────┘ │
+                                      └──────────────┼──────────────┘
+                                                     │
+                                      ┌──────────────▼──────────────┐
+                                      │         8. MEMBER           │
+                                      │ (Grassroots SHG Contributor)│
+                                      └─────────────────────────────┘
 ```
 
 ---
 
-# 🧑‍💻 Tech Stack
+## 🌟 Key Platform Modules & Capabilities
 
-## Frontend
-
-- React.js
-- Tailwind CSS
-- React Router
-- Axios
-- Context API
-- React Icons
-
-## Backend
-
-- Node.js
-- Express.js
-- JWT Authentication
-- bcrypt
-- Multer
-- Cloudinary
-
-## Database
-
-- MongoDB
-- Mongoose
+| Module | Core Functionality | Verification Status |
+| :--- | :--- | :---: |
+| **01. Public Portal** | Cooperative benefits, statutory info, inquiry desk | ✅ Operational |
+| **02. Auth & RBAC** | JWT HS256, bcrypt hashing, dynamic role switching | ✅ Operational |
+| **03. Super Admin** | Multi-society onboarding, health monitoring, audit logs | ✅ Operational |
+| **04. Org Admin** | Branch setup, society-wide aggregates, loan policies | ✅ Operational |
+| **05. Branch Operations** | Staff assignment, manager desks, KYC verification | ✅ Operational |
+| **06. Member KYC** | Aadhaar/PAN/Bank KYC pipeline, compliance note stamps | ✅ Operational |
+| **07. SHG/JLG Groups** | Group federation, leader elections, active context switching | ✅ Operational |
+| **08. Thrift Savings** | Auto account generation (`SAV-{Group}-{Member}`), ₹500 buffer | ✅ Operational |
+| **09. Digital Passbook** | Physical leather-bound theme, live ledger, `@media print` | ✅ Operational |
+| **10. Loan Products & CIBIL**| Reducing-balance interest, rule-based CIBIL score (300-900) | ✅ Operational |
+| **11. Democratic Sanction** | 2-tier approval: President review + Branch Manager sanction | ✅ Operational |
+| **12. EMI Amortization** | Reducing-balance schedules, automated savings auto-recovery | ✅ Operational |
+| **13. General Ledger** | Double-entry accounting (`Debits == Credits`), Chart of Accounts | ✅ Operational |
+| **14. Trial Balance** | Real-time financial reports with zero-variance balance badge | ✅ Operational |
+| **15. Meeting Governance** | Agenda planner, live attendance, quorum engine, minutes | ✅ Operational |
+| **16. Grievance & Chat** | Tiered complaint escalation desk & real-time intra-group chat | ✅ Operational |
 
 ---
 
-# 📂 Project Structure
+## 📊 Tailored Persona Workspaces
 
-```text
-Sahakara-ERP/
-
-frontend/
-│
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── layouts/
-│   ├── hooks/
-│   ├── contexts/
-│   ├── services/
-│   ├── assets/
-│   └── utils/
-
-backend/
-│
-├── controllers/
-├── models/
-├── routes/
-├── middleware/
-├── services/
-├── config/
-├── uploads/
-└── utils/
-
-README.md
-PROJECT_CONTEXT.md
-NAVIGATION_MAP.md
-```
+- **Super Admin Dashboard (`/super-admin/dashboard`)**: Platform-wide monitoring, society onboarding queue, audit search.
+- **Organization Admin Dashboard (`/org-admin/dashboard`)**: Society KPIs, branch performance, interest & credit policy.
+- **Branch Manager Dashboard (`/branches/dashboard`)**: Credit committee desk, loan sanctioning, branch GL/Trial balance.
+- **Group President Workspace (`/executive/dashboard`)**: Member roster, 1st tier loan recommendation, grievance triage.
+- **Group Secretary Workspace (`/secretary/dashboard`)**: Meeting scheduler, live attendance with quorum checks, minutes drafting.
+- **Group Treasurer Workspace (`/treasurer/dashboard`)**: Savings deposit approvals, withdrawal desk, EMI installment collection.
+- **Employee / Field Officer (`/employee/dashboard`)**: Doorstep collections, rapid KYC onboarding, SHG assistance.
+- **Regular Member Self-Service (`/member/dashboard`)**: Digital passbook, loan applications, EMI tracking, group chat.
 
 ---
 
-# 👥 User Roles
+## 🛠 Tech Stack
 
-| Role | Access |
-|------|--------|
-| 👑 Super Admin | Full Platform Control |
-| 🏢 Organization Admin | Manage Organization |
-| 🌿 Branch Manager | Manage Branch |
-| 👨‍💼 Employee | Daily Operations |
-| 💰 Treasurer | Finance |
-| 📝 Secretary | Meetings & Records |
-| 👤 Member | Self Services |
+### Frontend
+- **Framework**: React 18 with Vite 5
+- **Styling**: TailwindCSS 3.4 & Lucide React
+- **Routing**: React Router 6 with dynamic Role & Context guards
+- **HTTP Client**: Axios with automatic `x-active-group` header injection
 
----
-
-# 📌 Modules
-
-<details>
-<summary>📦 Click to View Modules</summary>
-
-- Landing Website
-- Authentication
-- Super Admin
-- Organization Management
-- Branch Management
-- User Management
-- Member Management
-- Roles & Permissions
-- Group Management
-- Savings Management
-- Loan Management
-- EMI Management
-- Accounting
-- Transaction Management
-- Meeting Management
-- Document Management
-- Communication
-- Reports & Analytics
-- Dashboard
-- Profile Management
-- Notifications
-- Search & Filters
-- Audit Logs
-- Settings
-- Help & Support
-
-</details>
+### Backend
+- **Runtime**: Node.js 20 LTS & Express 4
+- **Database**: MongoDB 7 with Mongoose 8 ORM
+- **Security**: Helmet, CORS, Express Rate Limit, bcrypt, JWT
+- **Accounting**: Double-entry ledger engine with atomic balance updates
 
 ---
 
-# 🚀 Application Flow
+## 🚀 Quickstart & Local Setup
 
-```text
-Landing Website
-        │
-        ▼
-Login
-        │
-        ▼
-Role Verification
-        │
-        ▼
-Dashboard
-        │
-        ▼
-Organization
-        │
-        ▼
-Branches
-        │
-        ▼
-Users
-        │
-        ▼
-Members
-        │
-        ▼
-Savings
-        │
-        ▼
-Loans
-        │
-        ▼
-Accounting
-        │
-        ▼
-Meetings
-        │
-        ▼
-Reports
-```
+### Prerequisites
+- Node.js 18+ or 20+
+- MongoDB 6+ running locally or MongoDB Atlas URI
 
----
-
-# 🔒 Security
-
-- JWT Authentication
-- Password Hashing
-- RBAC Authorization
-- Protected Routes
-- Organization Isolation
-- Secure File Upload
-- Audit Logging
-
----
-
-# 🎯 Current Development Progress
-
-| Module | Status |
-|---------|--------|
-| Landing Website | ✅ |
-| Authentication | ✅ |
-| Super Admin | ✅ |
-| Organization Management | ✅ |
-| Branch Management | ✅ |
-| User Management | ✅ |
-| Member Management | ✅ |
-| Roles & Permissions | ✅ |
-| Group Management | ✅ |
-| Savings Management | 🚧 |
-| Loan Management | ⏳ |
-| Remaining Modules | ⏳ |
-
----
-
-# 📸 Screenshots
-
-> *(Add screenshots here as the project develops.)*
-
-| Page | Preview |
-|------|---------|
-| Landing Page | 📷 |
-| Login | 📷 |
-| Dashboard | 📷 |
-| Member Management | 📷 |
-| Savings | 📷 |
-| Loans | 📷 |
-
----
-
-# ⚙ Installation
-
+### 1. Clone Repository
 ```bash
-# Clone repository
+git clone https://github.com/rohinisree2004/Sahakara.git
+cd Sahakara
+```
 
-git clone https://github.com/yourusername/Sahakara-ERP.git
-
-# Install frontend
-
-cd frontend
+### 2. Backend Setup
+```bash
+cd backend
 npm install
 
-# Install backend
+# Configure environment in backend/.env:
+# PORT=5000
+# MONGO_URI=mongodb://localhost:27017/sahakara_erp
+# JWT_SECRET=your_super_secret_jwt_key
+# JWT_EXPIRE=30d
 
-cd ../backend
-npm install
+# Seed comprehensive database (Societies, Branches, Users, Members, Loans, Accounting):
+npm run seed
 
-# Run frontend
-
-npm run dev
-
-# Run backend
-
+# Start backend development server:
 npm run dev
 ```
 
----
-
-# 📅 Development Roadmap
-
-```text
-✅ Landing Website
-
-✅ Authentication
-
-✅ Super Admin
-
-✅ Organization
-
-✅ Branch
-
-✅ User
-
-✅ Member
-
-✅ RBAC
-
-✅ Groups
-
-⬜ Savings
-
-⬜ Loans
-
-⬜ Accounting
-
-⬜ Meetings
-
-⬜ Reports
-
-⬜ Final Deployment
+### 3. Frontend Setup
+```bash
+cd ../frontend
+npm install
+npm run dev
 ```
+Open `http://localhost:5173` in your browser.
 
 ---
 
-# 🤝 Contribution
+## 📚 Authoritative Project Documentation
 
-Contributions, suggestions, and improvements are welcome.
-
-Feel free to fork the repository and submit a pull request.
-
----
-
-# 📄 License
-
-This project is developed for educational purposes as part of an MCA Mini Project.
+Comprehensive technical documentation is maintained in the repository root:
+- [PROJECT_OVERVIEW.md](file:///PROJECT_OVERVIEW.md) — Master Architecture and Persona Specification
+- [PROJECT_PROGRESS.md](file:///PROJECT_PROGRESS.md) — 16-Module Quality Audit and Completion Matrix
+- [PROJECT_DIARY.md](file:///PROJECT_DIARY.md) — Day-by-day 28-Day Development Chronicle
+- [API_AND_FRONTEND_DOCS.md](file:///API_AND_FRONTEND_DOCS.md) — API Endpoints & Frontend Architecture
+- [DATABASE_SCHEMA_AND_ARCHITECTURE.md](file:///DATABASE_SCHEMA_AND_ARCHITECTURE.md) — MongoDB Data Dictionary
 
 ---
 
-<div align="center">
-
-### 🌱 "Empowering Cooperative Societies through Digital Transformation."
-
-⭐ If you like this project, don't forget to star the repository!
-
-</div>
+## 📄 License & Academic Attribution
+Developed as part of the MCA Mini Project curriculum.
+Designed & Developed by **Rohini Sreekumar**.
+All rights reserved.
