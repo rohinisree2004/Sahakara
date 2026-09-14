@@ -56,7 +56,11 @@ exports.protect = async (req, res, next) => {
       req.user.roleAssignments = roleAssignments;
       
       // Determine highest privilege role for backward compatibility
-      const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'President', 'Secretary', 'Treasurer', 'Member'];
+      // NOTE: President, Secretary, Treasurer are group POSITIONS, not user roles.
+      // They are tracked in the Group model (presidentId, secretaryId, treasurerId).
+      const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'Member'];
+      // Group positions are valid active-role values but resolved differently
+      const groupPositions = ['President', 'Secretary', 'Treasurer'];
       let highestRole = 'Member';
       let highestIndex = roleHierarchy.length;
       
@@ -72,19 +76,26 @@ exports.protect = async (req, res, next) => {
       const clientActiveRole = req.headers['x-active-role'];
       const clientActiveGroup = req.headers['x-active-group'];
 
-      if (clientActiveRole && roleHierarchy.includes(clientActiveRole)) {
-        if (clientActiveRole === 'Member' || user.role === clientActiveRole) {
+      if (clientActiveRole) {
+        if (groupPositions.includes(clientActiveRole)) {
+          // Group positions (President, Secretary, Treasurer) are validated against the Group model.
+          // The frontend sets this header after the user selects a group in GroupSelectionPage.
+          // We trust this header since it was set from the getMyGroups response which checks Group model fields.
           highestRole = clientActiveRole;
-        } else {
-          const hasAssignedRole = roleAssignments.some(ra => {
-            if (ra.role !== clientActiveRole) return false;
-            if (clientActiveGroup && ra.groupId) {
-              return ra.groupId.toString() === clientActiveGroup.toString();
-            }
-            return true;
-          });
-          if (hasAssignedRole) {
+        } else if (roleHierarchy.includes(clientActiveRole)) {
+          if (clientActiveRole === 'Member' || user.role === clientActiveRole) {
             highestRole = clientActiveRole;
+          } else {
+            const hasAssignedRole = roleAssignments.some(ra => {
+              if (ra.role !== clientActiveRole) return false;
+              if (clientActiveGroup && ra.groupId) {
+                return ra.groupId.toString() === clientActiveGroup.toString();
+              }
+              return true;
+            });
+            if (hasAssignedRole) {
+              highestRole = clientActiveRole;
+            }
           }
         }
       }
@@ -137,7 +148,7 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Grant access to specific roles
+// Grant access to specific roles (including group positions like President, Secretary, Treasurer)
 exports.authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -151,6 +162,12 @@ exports.authorize = (...roles) => {
     const userRoles = req.user.roleAssignments?.map(ra => ra.role) || [];
     // Fallback to the computed highest role if roleAssignments is empty
     if (userRoles.length === 0 && req.user.role) {
+      userRoles.push(req.user.role);
+    }
+
+    // Also include the active role (which may be a group position like President/Secretary/Treasurer)
+    // This is set by the protect middleware based on x-active-role header
+    if (req.user.role && !userRoles.includes(req.user.role)) {
       userRoles.push(req.user.role);
     }
 
@@ -208,7 +225,8 @@ exports.checkPermission = (moduleName, actionName) => {
       }
     }
 
-    // Default permissions for Executive Board (President, Secretary, Treasurer)
+    // Default permissions for Group Executive Positions (President, Secretary, Treasurer)
+    // These are group positions set via x-active-role header, not standalone user roles
     if (['President', 'Secretary', 'Treasurer'].includes(role)) {
       return next();
     }

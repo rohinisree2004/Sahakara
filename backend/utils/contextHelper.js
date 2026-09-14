@@ -48,6 +48,9 @@ exports.getActiveContext = (req) => {
 
   // 4. Role-based Branch Scoping Enforcement
   const isBranchScopedRole = ['Branch Manager', 'Employee'].includes(user?.role);
+  // Group-scoped: Members and group positions (President, Secretary, Treasurer)
+  // NOTE: President/Secretary/Treasurer are group POSITIONS set via x-active-role header,
+  // not RoleAssignment roles. Members elected to these positions are still 'Member' in RoleAssignment.
   const isGroupScopedRole = ['President', 'Secretary', 'Treasurer', 'Member'].includes(user?.role);
 
   let finalBranchId = null;
