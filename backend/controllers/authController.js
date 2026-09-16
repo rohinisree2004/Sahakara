@@ -34,7 +34,10 @@ const sendTokenResponse = async (user, statusCode, res) => {
   );
 
   // Determine highest privilege role for backward compatibility & frontend routing
-  const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'President', 'Secretary', 'Treasurer', 'Member'];
+  // NOTE: President, Secretary, Treasurer are group POSITIONS (tracked in Group model),
+  // not standalone user roles. Members elected to these positions keep 'Member' as their
+  // base role and get their position resolved via getMyGroups + GroupSelectionPage.
+  const roleHierarchy = ['Super Admin', 'Organization Admin', 'Branch Manager', 'Employee', 'Member'];
   let highestRole = 'Member';
   let highestIndex = roleHierarchy.length;
   

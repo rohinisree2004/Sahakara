@@ -216,32 +216,24 @@ exports.getMyGroups = async (req, res, next) => {
 
     const result = groups.map((grp, idx) => {
       const gIdStr = grp._id.toString();
-      const ra = roleAssignments.find(r => r.groupId && r.groupId.toString() === gIdStr);
-      let role = ra ? ra.role : null;
+      
+      // Determine group position from Group model fields (presidentId, secretaryId, treasurerId)
+      // NOTE: President/Secretary/Treasurer are NOT RoleAssignment roles anymore.
+      // They are group positions tracked only in the Group model.
+      const presId = (grp.presidentId?._id || grp.presidentId)?.toString();
+      const secId = (grp.secretaryId?._id || grp.secretaryId)?.toString();
+      const tresId = (grp.treasurerId?._id || grp.treasurerId)?.toString();
+      const leadId = (grp.leaderId?._id || grp.leaderId)?.toString();
 
-      if (!role) {
-        const presId = (grp.presidentId?._id || grp.presidentId)?.toString();
-        const secId = (grp.secretaryId?._id || grp.secretaryId)?.toString();
-        const tresId = (grp.treasurerId?._id || grp.treasurerId)?.toString();
-        const leadId = (grp.leaderId?._id || grp.leaderId)?.toString();
-
-        if (presId && memberIdStrs.includes(presId)) {
-          role = 'President';
-        } else if (leadId && memberIdStrs.includes(leadId)) {
-          role = 'President';
-        } else if (secId && memberIdStrs.includes(secId)) {
-          role = 'Secretary';
-        } else if (tresId && memberIdStrs.includes(tresId)) {
-          role = 'Treasurer';
-        } else if (req.user.role === 'President' && idx === 0) {
-          role = 'President';
-        } else if (req.user.role === 'Secretary' && idx === 0) {
-          role = 'Secretary';
-        } else if (req.user.role === 'Treasurer' && idx === 0) {
-          role = 'Treasurer';
-        } else {
-          role = 'Member';
-        }
+      let role = 'Member';
+      if (presId && memberIdStrs.includes(presId)) {
+        role = 'President';
+      } else if (leadId && memberIdStrs.includes(leadId)) {
+        role = 'President';
+      } else if (secId && memberIdStrs.includes(secId)) {
+        role = 'Secretary';
+      } else if (tresId && memberIdStrs.includes(tresId)) {
+        role = 'Treasurer';
       }
 
       return {
@@ -524,29 +516,10 @@ exports.assignGroupLeader = async (req, res, next) => {
 
     await group.save();
 
-    // Synchronize group-level RoleAssignments for elected President, Secretary, Treasurer
-    const syncExecutiveRole = async (memberDocId, roleTitle) => {
-      if (!memberDocId) return;
-      const memDoc = await Member.findById(memberDocId);
-      if (memDoc && memDoc.userId) {
-        await RoleAssignment.findOneAndUpdate(
-          { userId: memDoc.userId, groupId: group._id },
-          {
-            userId: memDoc.userId,
-            role: roleTitle,
-            organizationId: group.organizationId,
-            branchId: group.branchId,
-            groupId: group._id,
-            status: 'Active',
-          },
-          { upsert: true, new: true }
-        );
-      }
-    };
-
-    if (effectivePresidentId) await syncExecutiveRole(effectivePresidentId, 'President');
-    if (secretaryId) await syncExecutiveRole(secretaryId, 'Secretary');
-    if (treasurerId) await syncExecutiveRole(treasurerId, 'Treasurer');
+    // NOTE: Group leadership positions (President, Secretary, Treasurer) are tracked
+    // ONLY in the Group model fields (presidentId, secretaryId, treasurerId).
+    // Members keep their 'Member' role in RoleAssignment. The getMyGroups endpoint
+    // determines group positions dynamically from the Group model.
 
     await logGroupAudit(req, 'GROUP_EXECUTIVES_ASSIGNED', `Elected executives for group '${group.groupName}' (${group.groupCode})`, orgId || group?.organizationId);
 
