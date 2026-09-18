@@ -137,8 +137,9 @@ export const AuthProvider = ({ children }) => {
           sessionStorage.setItem('sahakara_user', JSON.stringify(userData));
         }
 
-        // Cooperative Members & Elected Executives land on Group Selection Page first
-        const isGroupMemberRole = ['Member', 'President', 'Secretary', 'Treasurer'].includes(userData.role);
+        // Members always land on Group Selection Page first to choose a group and determine their position
+        // (President, Secretary, Treasurer positions are resolved at group selection time)
+        const isGroupMemberRole = userData.role === 'Member';
         const targetRoute = isGroupMemberRole ? '/select-group' : getDashboardRoute(userData.role);
 
         return { success: true, user: userData, targetRoute };

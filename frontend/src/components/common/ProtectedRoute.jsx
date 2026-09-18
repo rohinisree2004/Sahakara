@@ -23,7 +23,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Group perspective check: ONLY for Members and Group Elected Executives (President, Secretary, Treasurer)
+  // Group perspective check: Members and group positions (President, Secretary, Treasurer set after group selection)
   const isGroupRole = ['Member', 'President', 'Secretary', 'Treasurer'].includes(user?.role);
   
   // Non-group roles (Super Admin, Org Admin, Branch Manager, Employee) must NEVER be sent to /select-group
