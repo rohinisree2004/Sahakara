@@ -75,7 +75,7 @@ const LoginPage = () => {
     try {
       const res = await login(loginIdentifier.trim(), password.trim(), rememberMe);
       if (res && res.success) {
-        const isGroupMemberRole = ['Member', 'President', 'Secretary', 'Treasurer'].includes(res.user?.role);
+        const isGroupMemberRole = res.user?.role === 'Member';
         let redirectPath = '';
         if (isGroupMemberRole) {
           redirectPath = '/select-group';

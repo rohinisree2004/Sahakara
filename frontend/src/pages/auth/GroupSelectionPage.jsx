@@ -30,6 +30,7 @@ const GroupSelectionPage = () => {
 
   useEffect(() => {
     // If user is not in a group role (Super Admin, Org Admin, Branch Manager, Employee), redirect immediately to dashboard
+    // After login, all group members (including elected President/Secretary/Treasurer) arrive as 'Member'
     if (user && !['Member', 'President', 'Secretary', 'Treasurer'].includes(user.role)) {
       navigate(getDashboardRoute(user.role), { replace: true });
       return;
