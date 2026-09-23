@@ -97,9 +97,6 @@ const OrgEmployeesPage = () => {
             <option value="Organization Admin">Organization Admin</option>
             <option value="Branch Manager">Branch Manager</option>
             <option value="Employee">Teller / Staff</option>
-            <option value="President">Group President</option>
-            <option value="Secretary">Group Secretary</option>
-            <option value="Treasurer">Group Treasurer</option>
           </select>
         </div>
       </div>

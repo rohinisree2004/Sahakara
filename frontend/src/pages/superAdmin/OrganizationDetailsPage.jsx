@@ -1067,12 +1067,8 @@ const OrganizationDetailsPage = () => {
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
                   >
                     <option value="Organization Admin">Organization Admin</option>
-                    <option value="President">President</option>
-                    <option value="Secretary">Secretary</option>
-                    <option value="Treasurer">Treasurer</option>
                     <option value="Branch Manager">Branch Manager</option>
                     <option value="Employee">Employee</option>
-                    <option value="Member">Member</option>
                   </select>
                 </div>
                 <div>
