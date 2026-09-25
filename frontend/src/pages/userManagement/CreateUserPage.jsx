@@ -126,7 +126,7 @@ const CreateUserPage = () => {
             <span>Onboard New User Account</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Create user credentials with role assignment (Org Admin, President, Secretary, Treasurer, Employee, Member) and secure encryption
+            Create staff credentials with role assignment (Organization Admin, Branch Manager, Employee) and secure encryption
           </p>
         </div>
       </div>
@@ -237,11 +237,8 @@ const CreateUserPage = () => {
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-semibold focus:bg-white focus:outline-none focus:border-teal-600"
             >
               <option value="Organization Admin">Organization Admin</option>
-              <option value="President">President</option>
-              <option value="Secretary">Secretary</option>
-              <option value="Treasurer">Treasurer</option>
+              <option value="Branch Manager">Branch Manager</option>
               <option value="Employee">Employee / Teller</option>
-              <option value="Member">Society Member</option>
             </select>
           </div>
 

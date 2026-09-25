@@ -179,9 +179,6 @@ const UserProfilePage = () => {
             >
               <option value="Employee">Employee / Teller</option>
               <option value="Branch Manager">Branch Manager</option>
-              <option value="President">Group President</option>
-              <option value="Secretary">Group Secretary</option>
-              <option value="Treasurer">Group Treasurer</option>
               <option value="Member">Member</option>
             </select>
           </div>

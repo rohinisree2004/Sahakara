@@ -229,9 +229,7 @@ const UserListPage = () => {
           >
             <option value="All">All Roles</option>
             <option value="Organization Admin">Org Admin</option>
-            <option value="President">President</option>
-            <option value="Secretary">Secretary</option>
-            <option value="Treasurer">Treasurer</option>
+            <option value="Branch Manager">Branch Manager</option>
             <option value="Employee">Employee</option>
             <option value="Member">Member</option>
           </select>
