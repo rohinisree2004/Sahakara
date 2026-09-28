@@ -41,6 +41,8 @@ const RecordRepaymentPage = () => {
   const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
   const userBranchId = user?.branchId?._id || user?.branchId || '';
 
+  const isGroupScopedRole = ['President', 'Secretary', 'Treasurer'].includes(user?.role);
+
   const defaultOrg = isSuperAdmin ? 'All' : (user?.organizationId?._id || user?.organizationId || '');
   const defaultBranch = isBranchScoped ? userBranchId : 'All';
 
@@ -104,7 +106,13 @@ const RecordRepaymentPage = () => {
     if (effBranch && effBranch !== 'All') params.branchId = effBranch;
 
     fetchGroups(params).then(res => {
-      if (res.data?.success) setGroups(res.data.data || []);
+      if (res.data?.success) {
+        const gList = res.data.data || [];
+        setGroups(gList);
+        if (isGroupScopedRole && gList.length > 0) {
+          setSelectedGroupId(gList[0]._id);
+        }
+      }
     }).catch(console.warn);
   }, [selectedOrgId, selectedBranchId, isBranchScoped, userBranchId]);
 
@@ -391,9 +399,10 @@ const RecordRepaymentPage = () => {
               <select
                 value={selectedGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-teal-600 cursor-pointer"
+                disabled={isGroupScopedRole}
+                className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900 focus:outline-none focus:border-teal-600 cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed"
               >
-                <option value="All">All Groups</option>
+                {!isGroupScopedRole && <option value="All">All Groups</option>}
                 {groups.map(g => <option key={g._id} value={g._id}>{g.name}</option>)}
               </select>
             </div>
