@@ -38,6 +38,8 @@ const LoanApplicationPage = () => {
   const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
   const userBranchId = user?.branchId?._id || user?.branchId || '';
 
+  const isGroupScopedRole = ['President', 'Secretary', 'Treasurer'].includes(user?.role);
+
   const [organizations, setOrganizations] = useState([]);
   const [branches, setBranches] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -136,7 +138,13 @@ const LoanApplicationPage = () => {
             setFormData(f => ({ ...f, branchId: bList[0]._id }));
           }
         }
-        if (gRes.data?.success) setGroups(gRes.data.data || []);
+        if (gRes.data?.success) {
+          const gList = gRes.data.data || [];
+          setGroups(gList);
+          if (isGroupScopedRole && gList.length > 0) {
+            setSelectedGroupId(gList[0]._id);
+          }
+        }
         if (mRes.data?.success) setMembers(mRes.data.data || []);
       } catch (err) {
         console.warn('Scope data error:', err.message);
@@ -348,9 +356,10 @@ const LoanApplicationPage = () => {
                 <select
                   value={selectedGroupId}
                   onChange={(e) => setSelectedGroupId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600"
+                  disabled={isGroupScopedRole}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-teal-600 disabled:opacity-80"
                 >
-                  <option value="All">All Groups</option>
+                  {!isGroupScopedRole && <option value="All">All Groups</option>}
                   {groups.map(g => (
                     <option key={g._id} value={g._id}>{g.groupName} ({g.groupCode})</option>
                   ))}

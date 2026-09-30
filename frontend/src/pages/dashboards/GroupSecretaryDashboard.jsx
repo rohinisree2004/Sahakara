@@ -87,7 +87,7 @@ const GroupSecretaryDashboard = () => {
         const resolved = list.find(m => m.userId === user?._id || m.phone === user?.phone || m.email === user?.email) || list[0] || null;
         setMyMember(resolved);
         if (resolved?._id) {
-          fetchSavingsAccounts({ memberId: resolved._id }).then(sRes => {
+          fetchSavingsAccounts({ memberId: resolved._id, myOnly: 'true' }).then(sRes => {
             if (sRes.data?.success) {
               const list = sRes.data.data || [];
               const acc = list.find(a => (a.groupId?._id || a.groupId)?.toString() === activeGroup?._id?.toString()) || list[0] || null;
@@ -117,8 +117,7 @@ const GroupSecretaryDashboard = () => {
     setSubmittingModal(true);
     try {
       const res = await submitDepositRequestApi({
-        memberId: myMember?._id,
-        groupId: activeGroup?._id,
+        accountId: mySavings?._id,
         amount: Number(depositForm.amount),
         paymentMethod: depositForm.paymentMethod,
         referenceNumber: depositForm.referenceNumber,
@@ -143,8 +142,7 @@ const GroupSecretaryDashboard = () => {
     setSubmittingModal(true);
     try {
       const res = await submitWithdrawalRequestApi({
-        memberId: myMember?._id,
-        groupId: activeGroup?._id,
+        accountId: mySavings?._id,
         amount: Number(withdrawForm.amount),
         paymentMethod: withdrawForm.paymentMethod,
         remarks: withdrawForm.reason || 'Personal Withdrawal Request'
@@ -165,7 +163,7 @@ const GroupSecretaryDashboard = () => {
     (m) => m.status === 'Scheduled' || new Date(m.scheduledDate) >= new Date()
   ).slice(0, 5);
 
-  const myBalance = mySavings?.account?.currentBalance || 0;
+  const myBalance = mySavings?.currentBalance || 0;
 
   const formatCurrency = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
@@ -480,7 +478,7 @@ const GroupSecretaryDashboard = () => {
                     </p>
                   </div>
                   <Link
-                    to={`/meetings/attendance`}
+                    to={`/meetings/${m._id}`}
                     className="px-3 py-1.5 rounded-lg bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold hover:bg-teal-100 transition-colors shrink-0 flex items-center gap-1"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />

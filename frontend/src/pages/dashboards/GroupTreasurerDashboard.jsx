@@ -49,6 +49,25 @@ import {
 const GroupTreasurerDashboard = () => {
   const { user, activeGroup } = useAuth();
   
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   // Treasury Data
   const [savingsStats, setSavingsStats] = useState(null);
   const [upcomingEmis, setUpcomingEmis] = useState([]);
@@ -143,7 +162,7 @@ const GroupTreasurerDashboard = () => {
         const resolved = list.find(m => m.userId === user?._id || m.phone === user?.phone || m.email === user?.email) || list[0] || null;
         setMyMember(resolved);
         if (resolved?._id) {
-          fetchSavingsAccounts({ memberId: resolved._id }).then(sRes => {
+          fetchSavingsAccounts({ memberId: resolved._id, myOnly: 'true' }).then(sRes => {
             if (sRes.data?.success) {
               const list = sRes.data.data || [];
               const acc = list.find(a => (a.groupId?._id || a.groupId)?.toString() === activeGroup?._id?.toString()) || list[0] || null;
@@ -230,8 +249,7 @@ const GroupTreasurerDashboard = () => {
     setSubmittingModal(true);
     try {
       const res = await submitDepositRequestApi({
-        memberId: myMember?._id,
-        groupId: activeGroup?._id,
+        accountId: mySavings?._id,
         amount: Number(depositForm.amount),
         paymentMethod: depositForm.paymentMethod,
         referenceNumber: depositForm.referenceNumber,
@@ -257,8 +275,7 @@ const GroupTreasurerDashboard = () => {
     setSubmittingModal(true);
     try {
       const res = await submitWithdrawalRequestApi({
-        memberId: myMember?._id,
-        groupId: activeGroup?._id,
+        accountId: mySavings?._id,
         amount: Number(withdrawForm.amount),
         paymentMethod: withdrawForm.paymentMethod,
         remarks: withdrawForm.reason || 'Personal Withdrawal Request'
@@ -278,10 +295,8 @@ const GroupTreasurerDashboard = () => {
 
   const totalUpcomingAmount = upcomingEmis.reduce((sum, item) => sum + (item.emiAmount || 0), 0);
   const totalOverdueAmount = overdueEmis.reduce((sum, item) => sum + (item.emiAmount || 0), 0);
-  const myBalance = mySavings?.account?.currentBalance || 0;
+  const myBalance = mySavings?.currentBalance || 0;
 
-  const formatCurrency = (val) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
   if (loading) {
     return (
@@ -464,14 +479,19 @@ const GroupTreasurerDashboard = () => {
       {/* 2. TREASURY KPI METRICS */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Group Total Thrift</span>
-            <Wallet className="w-5 h-5 text-teal-600" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Group Total Thrift</span>
+              <Wallet className="w-5 h-5 text-teal-600" />
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 font-mono">
+              {formatCurrency(savingsStats?.totalSavings || 0)}
+            </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 font-mono">
-            {formatCurrency(savingsStats?.totalSavingsBalance || 142500)}
-          </div>
+          <Link to="/savings/transactions" className="text-[10px] font-bold text-teal-600 hover:underline mt-3 block">
+            View Full Group Statement →
+          </Link>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs bg-amber-50/20">
