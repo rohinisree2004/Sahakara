@@ -33,6 +33,9 @@ const CreateMeetingPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isSuperAdmin = user?.role === 'Super Admin' || user?.role?.name === 'Super Admin';
+  const isBranchScoped = ['Branch Manager', 'Employee'].includes(user?.role);
+  const userBranchId = user?.branchId?._id || user?.branchId || '';
+  const isGroupScopedRole = ['President', 'Secretary', 'Treasurer'].includes(user?.role);
 
   // Hierarchical Data State
   const [organizations, setOrganizations] = useState([]);
@@ -42,11 +45,11 @@ const CreateMeetingPage = () => {
   // Form State
   const [formData, setFormData] = useState({
     organizationId: user?.organizationId?._id || user?.organizationId || '',
-    branchId: '',
+    branchId: isBranchScoped ? userBranchId : '',
     groupId: '',
     title: '',
-    meetingType: 'Annual General Meeting (AGM)',
-    audienceTargetType: 'AllMembers',
+    meetingType: isGroupScopedRole ? 'Group Meeting' : 'Annual General Meeting (AGM)',
+    audienceTargetType: isGroupScopedRole ? 'EntireGroup' : 'AllMembers',
     date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
     startTime: '10:00 AM',
     endTime: '01:00 PM',
@@ -102,6 +105,9 @@ const CreateMeetingPage = () => {
         if (res.data?.success) {
           const branchList = res.data.data || [];
           setBranches(branchList);
+          if (isBranchScoped && userBranchId) {
+            setFormData(prev => ({ ...prev, branchId: userBranchId }));
+          }
         }
       } catch (err) {
         console.error('Failed to load branches', err);
@@ -119,7 +125,11 @@ const CreateMeetingPage = () => {
         if (formData.branchId) params.branchId = formData.branchId;
         const res = await fetchGroups(params);
         if (res.data?.success) {
-          setGroups(res.data.data || []);
+          const gList = res.data.data || [];
+          setGroups(gList);
+          if (isGroupScopedRole && gList.length > 0) {
+            setFormData(prev => ({ ...prev, groupId: gList[0]._id }));
+          }
         }
       } catch (err) {
         console.error('Failed to load groups', err);
@@ -353,9 +363,10 @@ const CreateMeetingPage = () => {
                 name="branchId"
                 value={formData.branchId}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
+                disabled={isBranchScoped}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all disabled:opacity-80"
               >
-                <option value="">All Branches / Head Office</option>
+                {!isBranchScoped && <option value="">All Branches / Head Office</option>}
                 {branches.map(b => (
                   <option key={b._id} value={b._id}>{b.branchName} ({b.branchCode})</option>
                 ))}
@@ -371,9 +382,10 @@ const CreateMeetingPage = () => {
                 name="groupId"
                 value={formData.groupId}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all"
+                disabled={isGroupScopedRole}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-semibold focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all disabled:opacity-80"
               >
-                <option value="">Not Applicable / General Assembly</option>
+                {!isGroupScopedRole && <option value="">Not Applicable / General Assembly</option>}
                 {groups.map(g => (
                   <option key={g._id} value={g._id}>{g.groupName} ({g.groupCode})</option>
                 ))}

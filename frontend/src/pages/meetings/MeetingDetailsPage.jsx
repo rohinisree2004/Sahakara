@@ -269,6 +269,35 @@ const MeetingDetailsPage = () => {
     }
   };
 
+  const handleAutoGenerateMinutes = () => {
+    const meeting = data?.meeting;
+    const agendas = data?.agendas;
+    if (!meeting) return;
+    
+    const dateStr = new Date(meeting.scheduledDate || meeting.date || Date.now()).toLocaleDateString('en-IN');
+    const autoSummary = `The ${meeting.meetingType || 'General'} meeting titled "${meeting.title}" was convened on ${dateStr} at ${meeting.location || 'Society Head Office'}. The Chairman welcomed the members and declared the quorum present to proceed with the statutory agenda items.`;
+    
+    const discussionPoints = (agendas && agendas.length > 0) 
+      ? agendas.map((a, i) => `${i + 1}. ${a.title}: ${a.description || 'Discussed in detail by the committee.'}`).join('\\n')
+      : "Detailed discussions were held regarding the society's operational and financial performance.";
+    const autoDiscussions = `The following key matters were deliberated upon:\\n${discussionPoints}`;
+    
+    const decisionPoints = (agendas && agendas.length > 0)
+      ? agendas.map((a, i) => `Approved and adopted the proposals regarding ${a.title}.`).join('\\n')
+      : "The committee unanimously approved all presented proposals and reports.";
+    const autoDecisions = `Decisions formalized during the assembly:\\n${decisionPoints}`;
+    
+    const autoResolutions = `Resolution 1: RESOLVED that the proceedings of the meeting are adopted as true and correct.\\nResolution 2: RESOLVED that the Secretary is authorized to execute the necessary filings and updates.`;
+
+    setMinuteForm({
+      summary: autoSummary,
+      discussions: autoDiscussions,
+      decisions: autoDecisions,
+      resolutions: autoResolutions
+    });
+    setSuccessMsg('Meeting report Draft Auto-Generated successfully! Review and Save.');
+  };
+
   // 5. Action Items Handler
   const handleAddAction = async (e) => {
     e.preventDefault();
@@ -822,6 +851,15 @@ const MeetingDetailsPage = () => {
               </span>
             ) : (
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoGenerateMinutes}
+                  disabled={savingMinutes || finalizingMinutes}
+                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-Generate Draft
+                </button>
                 <button
                   type="button"
                   onClick={handleSaveMinutes}

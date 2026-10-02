@@ -49,12 +49,49 @@ const GroupReportsPage = () => {
   }, [reportType, activeGroup]);
 
   const handleExportPDF = () => {
-    setExportMsg(`Exporting ${reportType} Report as formatted PDF document... Saved to downloads.`);
-    setTimeout(() => setExportMsg(''), 4000);
+    setExportMsg(`Preparing PDF Document for printing...`);
+    setTimeout(() => {
+      setExportMsg('');
+      window.print();
+    }, 1000);
   };
 
   const handleExportExcel = () => {
-    setExportMsg(`Exporting ${reportType} Report as Excel spreadsheet (.xlsx)... Saved to downloads.`);
+    if (!filteredList || filteredList.length === 0) {
+      setExportMsg('No data available to export.');
+      setTimeout(() => setExportMsg(''), 4000);
+      return;
+    }
+
+    const headers = ['Group Code', 'Group Name', 'Elected President / Leader', 'Enrolled Roster', 'Savings Pool', 'Active Loans'];
+    
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+
+    filteredList.forEach(row => {
+      const values = [
+        row.groupCode,
+        `"${(row.name || '').replace(/"/g, '""')}"`,
+        `"${(row.leader || '').replace(/"/g, '""')}"`,
+        row.memberCount,
+        `"${(row.savings || '').replace(/"/g, '""')}"`,
+        `"${(row.loans || '').replace(/"/g, '""')}"`
+      ];
+      csvRows.push(values.join(','));
+    });
+
+    const csvData = csvRows.join('\n');
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${reportType}_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setExportMsg(`Exporting ${reportType} Report as spreadsheet (.csv)... Saved to downloads.`);
     setTimeout(() => setExportMsg(''), 4000);
   };
 
@@ -75,11 +112,16 @@ const GroupReportsPage = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <Link 
-            to={isMember ? "/member/dashboard" : "/groups/dashboard"} 
+            to={
+              user?.role === 'President' ? "/executive/dashboard" :
+              user?.role === 'Secretary' ? "/secretary/dashboard" :
+              user?.role === 'Treasurer' ? "/treasurer/dashboard" :
+              isMember ? "/member/dashboard" : "/groups/dashboard"
+            } 
             className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-800 hover:text-teal-950 mb-1"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{isMember ? 'Back to Member Dashboard' : 'Back to Groups Dashboard'}</span>
+            <span>{isMember ? 'Back to Member Dashboard' : 'Back to Dashboard'}</span>
           </Link>
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-800 font-bold">
